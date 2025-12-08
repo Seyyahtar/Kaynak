@@ -10,6 +10,9 @@ import { toast } from 'sonner@2.0.3';
 import { importFromExcel, exportToExcel, exportImplantList } from '../utils/excelUtils';
 import DeviceGrouping from './DeviceGrouping';
 
+const DEFAULT_IMPLANT_TEMPLATE_URL = '/Implant list.xlsx';
+const DEFAULT_IMPLANT_TEMPLATE_NAME = 'Implant list.xlsx';
+
 interface StockPageProps {
   onNavigate: (page: Page, data?: any) => void;
   currentUser: string;
@@ -49,16 +52,34 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
   const [editingValues, setEditingValues] = useState<Partial<StockItem>>({});
   const [sortStates, setSortStates] = useState<{[key: string]: {field: SortField | null, order: SortOrder}}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const templateFileInputRef = useRef<HTMLInputElement>(null);
   const [implantExportOpen, setImplantExportOpen] = useState(false);
   const [implantStartDate, setImplantStartDate] = useState(defaultStartStr);
   const [implantEndDate, setImplantEndDate] = useState(todayStr);
-  const [implantTemplateName, setImplantTemplateName] = useState('');
   const [implantTemplateData, setImplantTemplateData] = useState<ArrayBuffer | null>(null);
 
   useEffect(() => {
     loadStock();
   }, []);
+
+  useEffect(() => {
+    if (implantTemplateData) return;
+
+    const loadDefaultTemplate = async () => {
+      try {
+        const response = await fetch(encodeURI(DEFAULT_IMPLANT_TEMPLATE_URL));
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const buffer = await response.arrayBuffer();
+        setImplantTemplateData(buffer);
+      } catch (error) {
+        console.warn('Varsayilan implant sablonu yuklenemedi', error);
+        toast.error('Varsayilan implant sablonu yuklenemedi. Lutfen yeniden deneyin.');
+      }
+    };
+
+    loadDefaultTemplate();
+  }, [implantTemplateData]);
 
   const loadStock = () => {
     const stockData = storage.getStock();
@@ -162,7 +183,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
     }
 
     if (!implantTemplateData) {
-      toast.error('Lütfen implant şablon dosyasını seçin');
+      toast.error('Varsayilan sablon kullanilamadi, lutfen bir sablon dosyasi secin');
       return;
     }
 
@@ -203,10 +224,6 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleTemplatePickerClick = () => {
-    templateFileInputRef.current?.click();
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,27 +289,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       console.error(error);
     }
   };
-
-  const handleTemplateFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImplantTemplateData(reader.result as ArrayBuffer);
-      setImplantTemplateName(file.name);
-      toast.success('İmplant şablonu yüklendi');
-      if (templateFileInputRef.current) {
-        templateFileInputRef.current.value = '';
-      }
-    };
-    reader.onerror = () => {
-      toast.error('Şablon dosyası okunamadı');
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  // Filtrelenmiş stok sayısını hesapla
+  // Filtrelenmis stok sayisini hesapla
   const filteredStockData = React.useMemo(() => {
     return stock.filter(item => {
       return filterStockByCategory(item) && filterStockBySearch(item);
@@ -632,17 +629,6 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-slate-600">Şablon dosyası</Label>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" size="sm" variant="outline" className="flex-1" onClick={handleTemplatePickerClick}>
-                      Şablon Seç (.xlsx)
-                    </Button>
-                    {implantTemplateName && (
-                      <span className="text-xs text-slate-600 truncate" title={implantTemplateName}>
-                        {implantTemplateName}
-                      </span>
-                    )}
-                  </div>
                 </div>
                 <Button className="w-full" onClick={handleExportImplantList}>
                   Implant listesi olustur
@@ -662,13 +648,6 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileSelect}
-              className="hidden"
-            />
-            <input
-              ref={templateFileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleTemplateFileSelect}
               className="hidden"
             />
             

@@ -46,32 +46,32 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
           <style>
             @media print { body { -webkit-print-color-adjust: exact; } }
             :root {
-              --bg: #0b1220;
-              --muted: #94a3b8;
-              --text: #006effff;
-              --accent: #8b5cf6;
-              --accent-soft: rgba(139,92,246,0.12);
+              --bg: #000000ff;
+              --muted: #2a84faff;
+              --text: #000000ff;
+              --accent: #000000ff;
+              --accent-soft: rgba(72, 72, 72, 1);
             }
             * { box-sizing: border-box; }
             body { font-family: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif; background: var(--bg); padding: 32px; color: var(--text); }
             .page { max-width: 960px; margin: 0 auto; }
-            .card { background: linear-gradient(145deg, rgba(255,255,255,0.02), rgba(255,255,255,0)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+            .card { background: linear-gradient(145deg, rgba(255, 255, 255, 0), rgba(255,255,255,0)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
             .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
             .chip { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: #ede9fe; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; font-size: 12px; }
             .title { font-size: 26px; font-weight: 800; margin: 6px 0 0 0; }
             .meta { color: var(--muted); font-size: 14px; }
             .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 14px 0 10px; }
-            .field { padding: 14px; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; background: rgba(255,255,255,0.02); }
+            .field { padding: 14px; border: 1px solid rgba(93, 91, 91, 0.55); border-radius: 14px; background: rgba(255,255,255,0.02); }
             .label { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
             .value { font-size: 16px; font-weight: 700; color: var(--text); }
             .section { margin-top: 18px; }
             .section-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
-            .pill { padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--muted); font-size: 12px; }
+            .pill { padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0); color: var(--muted); font-size: 12px; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid rgba(255,255,255,0.06); }
             th, td { text-align: left; padding: 12px 10px; }
             th { background: rgba(255,255,255,0.05); font-size: 12px; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
             tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
-            tr:hover td { background: rgba(139,92,246,0.06); }
+            tr:hover td { background: rgba(255, 255, 255, 0); }
             .note { margin-top: 6px; padding: 14px; border-radius: 14px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); color: #ede9fe; }
           </style>
         </head>
