@@ -6,6 +6,7 @@ import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { storage } from '../utils/storage';
 import { toast } from 'sonner@2.0.3';
+import { Capacitor } from '@capacitor/core';
 
 interface LoginPageProps {
   onLogin: (username: string) => void;
@@ -14,7 +15,7 @@ interface LoginPageProps {
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!username.trim()) {

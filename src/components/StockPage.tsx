@@ -161,22 +161,22 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
            item.ubbCode.toLowerCase().includes(search);
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     try {
       const stockData = storage.getStock();
       if (stockData.length === 0) {
         toast.error('Dışa aktarılacak stok verisi yok');
         return;
       }
-      exportToExcel(stockData);
-      toast.success('Stok listesi Excel olarak dışa aktarıldı');
+      await exportToExcel(stockData);
+      toast.success('Excel dosyası oluşturuldu. Paylaşım menüsünden "Dosyalar" seçerek konum belirleyin.');
     } catch (error) {
-      toast.error('Excel dışa aktarma hatası');
-      console.error(error);
+      toast.error('Excel dışa aktarma hatası: ' + (error as Error).message);
+      console.error('Excel export error:', error);
     }
   };
 
-  const handleExportImplantList = () => {
+  const handleExportImplantList = async () => {
     if (!implantStartDate || !implantEndDate) {
       toast.error('Baslangic ve bitis tarihlerini secin');
       return;
@@ -214,8 +214,8 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
     try {
       const fileLabel = 'BIO-TR_implant_list_' + implantStartDate + '_' + implantEndDate + '.xlsx';
-      exportImplantList(filtered, currentUser, fileLabel, implantTemplateData);
-      toast.success(filtered.length + ' vaka icin implant listesi olusturuldu');
+      await exportImplantList(filtered, currentUser, fileLabel, implantTemplateData);
+      toast.success(filtered.length + ' vaka için implant listesi oluşturuldu. Paylaşım menüsünden konum seçin.');
     } catch (err) {
       console.error(err);
       toast.error('Implant listesi disa aktarma hatasi');

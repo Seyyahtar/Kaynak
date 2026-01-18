@@ -1,6 +1,10 @@
 ﻿// Excel işlemleri için yardımcı fonksiyonlar
 import * as XLSX from "xlsx";
 import { StockItem, ChecklistPatient, CaseRecord } from "../types";
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { Capacitor } from "@capacitor/core";
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 
 const toInitials = (fullName: string) => {
   if (!fullName) return '';
@@ -11,7 +15,7 @@ const toInitials = (fullName: string) => {
   return initials.length ? initials.join('.') : '';
 };
 
-// Stok için Excel içe aktarımı
+// Stok için Excel içe aktarımı (3 farklı formatı destekler)
 export const importFromExcel = (file: File): Promise<StockItem[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -26,23 +30,47 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
 
         const stockItems: StockItem[] = [];
 
-        // Header indekslerini bul (başlık değişirse fallback olarak eski sıralar kullanılır)
+        // Header indekslerini bul
         const header = (jsonData[0] || []).map((h: any) => h?.toString().toLowerCase().trim());
         const findIndex = (key: string, fallback: number) => {
           const idx = header.findIndex((h: string) => h === key);
           return idx >= 0 ? idx : fallback;
         };
 
-        const idxMaterialCode = findIndex("malzeme kodu", 1);
-        const idxMaterialName = findIndex("malzeme açıklaması", 2);
-        const idxUbb = findIndex("ubb kodu", 3);
-        const idxDescription = findIndex("açıklama", 4);
-        const idxQuantity = findIndex("miktar", 5);
+        // Formatı belirle
+        const hasSerialLotColumn = header.includes("seri/lot no");
+        const hasExpiryColumn = header.includes("s.k.t");
+        const hasDescriptionColumn = header.includes("açıklama");
+        const hasTrackingNumber = header.includes("takip numarası");
+
+        let formatType = "";
+        if (hasSerialLotColumn && hasExpiryColumn) {
+          formatType = "output"; // Çıktı Tablosu
+        } else if (hasDescriptionColumn) {
+          formatType = "type2"; // 2.Tip Veri Tablosu
+        } else if (hasTrackingNumber) {
+          formatType = "type1"; // 1.Tip Veri Tablosu
+        } else {
+          // Fallback: eski format
+          formatType = "legacy";
+        }
+
+        console.log("Tespit edilen format:", formatType);
 
         const parseQuantity = (value: any) => {
           if (value === undefined || value === null) return 0;
-          const num = parseInt(value.toString().replace(/[^0-9-]/g, ""), 10);
+          const str = value.toString().replace(/[^0-9]/g, "");
+          const num = parseInt(str, 10);
           return isNaN(num) ? 0 : num;
+        };
+
+        // Excel tarih formatından normal tarihe çevir (1900-01-01 = 1)
+        const excelDateToJSDate = (excelDate: any) => {
+          if (!excelDate) return "";
+          const num = parseInt(excelDate.toString(), 10);
+          if (isNaN(num) || num < 1) return "";
+          const date = new Date((num - 1) * 24 * 60 * 60 * 1000 + new Date(1900, 0, 1).getTime());
+          return date.toISOString().split("T")[0]; // YYYY-MM-DD format
         };
 
         // İlk satır başlık olduğu için 1'den başla
@@ -50,57 +78,125 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
           const row = jsonData[i];
           if (!row || row.length === 0) continue;
 
-          const materialCode = row[idxMaterialCode]?.toString().trim() || "";
-          const materialName = row[idxMaterialName]?.toString().trim() || "";
-          const descriptionCell = row[idxDescription]?.toString().trim() || "";
-          const quantity = parseQuantity(row[idxQuantity]);
-
-          if (!materialName || quantity <= 0) continue;
-
-          // Açıklama hücresini parse et
+          let materialCode = "";
+          let materialName = "";
+          let ubbCode = "";
           let serialLotNumber = "";
           let expiryDate = "";
-          let ubbCode = row[idxUbb]?.toString().trim() || "";
+          let quantity = 0;
 
-          const parts = descriptionCell.split("\\");
-          parts.forEach((part) => {
-            const cleanPart = part.trim();
+          if (formatType === "output") {
+            // Çıktı Tablosu formatı
+            materialCode = row[findIndex("malzeme kodu", 1)]?.toString().trim() || "";
+            materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
+            ubbCode = row[findIndex("ubb kodu", 3)]?.toString().trim() || "";
+            serialLotNumber = row[findIndex("seri/lot no", 4)]?.toString().trim() || "";
+            const expiryDateRaw = row[findIndex("s.k.t", 5)];
+            expiryDate = excelDateToJSDate(expiryDateRaw);
+            quantity = parseQuantity(row[findIndex("miktar", 6)]);
 
-            const lotMatch = cleanPart.match(/^LOT:(.+)$/i);
-            if (lotMatch) {
-              serialLotNumber = lotMatch[1].trim();
-              return;
-            }
+          } else if (formatType === "type2") {
+            // 2.Tip Veri Tablosu formatı
+            materialCode = row[findIndex("malzeme kodu", 1)]?.toString().trim() || "";
+            materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
+            ubbCode = row[findIndex("ubb kodu", 3)]?.toString().trim() || "";
+            const descriptionCell = row[findIndex("açıklama", 4)]?.toString().trim() || "";
+            quantity = parseQuantity(row[findIndex("miktar", 5)]);
 
-            const seriMatch = cleanPart.match(/^SERI:(.+)$/i);
-            if (seriMatch) {
-              serialLotNumber = seriMatch[1].trim();
-              return;
-            }
+            // Açıklama alanından parse et
+            const parts = descriptionCell.split("\\");
+            parts.forEach((part: string) => {
+              const cleanPart = part.trim();
 
-            const sktMatch = cleanPart.match(/^SKT:(.+)$/i);
-            if (sktMatch) {
-              const dateStr = sktMatch[1].trim();
-              const dateParts = dateStr.split(/[\/.]/);
-              if (dateParts.length === 3) {
-                const day = dateParts[0].padStart(2, "0");
-                const month = dateParts[1].padStart(2, "0");
-                const year = dateParts[2];
-                expiryDate = `${year}-${month}-${day}`;
+              const lotMatch = cleanPart.match(/^LOT:(.+)$/i);
+              if (lotMatch) {
+                serialLotNumber = lotMatch[1].trim();
+                return;
               }
-              return;
-            }
 
-            const ubbMatch = cleanPart.match(/^UBB:(.+)$/i);
-            if (ubbMatch) {
-              ubbCode = ubbMatch[1].trim();
-              return;
-            }
-          });
+              const seriMatch = cleanPart.match(/^SERI:(.+)$/i);
+              if (seriMatch) {
+                serialLotNumber = seriMatch[1].trim();
+                return;
+              }
 
-          if (!serialLotNumber && descriptionCell) {
-            serialLotNumber = descriptionCell;
+              const sktMatch = cleanPart.match(/^SKT:(.+)$/i);
+              if (sktMatch) {
+                const dateStr = sktMatch[1].trim();
+                const dateParts = dateStr.split(/[\/.]/);
+                if (dateParts.length === 3) {
+                  const day = dateParts[0].padStart(2, "0");
+                  const month = dateParts[1].padStart(2, "0");
+                  const year = dateParts[2];
+                  expiryDate = `${year}-${month}-${day}`;
+                }
+                return;
+              }
+
+              const ubbMatch = cleanPart.match(/^UBB:(.+)$/i);
+              if (ubbMatch) {
+                ubbCode = ubbMatch[1].trim();
+              }
+            });
+
+          } else if (formatType === "type1") {
+            // 1.Tip Veri Tablosu formatı
+            materialCode = row[findIndex("malzeme kodu", 0)]?.toString().trim() || "";
+            serialLotNumber = row[findIndex("takip numarası", 1)]?.toString().trim() || "";
+            materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
+            const expiryDateRaw = row[findIndex("son kullanma tarihi", 4)];
+            expiryDate = excelDateToJSDate(expiryDateRaw);
+            quantity = parseQuantity(row[findIndex("miktar", 3)]);
+
+          } else {
+            // Legacy format (eski açıklama tabanlı)
+            materialCode = row[findIndex("malzeme kodu", 1)]?.toString().trim() || "";
+            materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
+            const descriptionCell = row[findIndex("açıklama", 4)]?.toString().trim() || "";
+            quantity = parseQuantity(row[findIndex("miktar", 5)]);
+
+            // Açıklama hücresini parse et
+            const parts = descriptionCell.split("\\");
+            parts.forEach((part: string) => {
+              const cleanPart = part.trim();
+
+              const lotMatch = cleanPart.match(/^LOT:(.+)$/i);
+              if (lotMatch) {
+                serialLotNumber = lotMatch[1].trim();
+                return;
+              }
+
+              const seriMatch = cleanPart.match(/^SERI:(.+)$/i);
+              if (seriMatch) {
+                serialLotNumber = seriMatch[1].trim();
+                return;
+              }
+
+              const sktMatch = cleanPart.match(/^SKT:(.+)$/i);
+              if (sktMatch) {
+                const dateStr = sktMatch[1].trim();
+                const dateParts = dateStr.split(/[\/.]/);
+                if (dateParts.length === 3) {
+                  const day = dateParts[0].padStart(2, "0");
+                  const month = dateParts[1].padStart(2, "0");
+                  const year = dateParts[2];
+                  expiryDate = `${year}-${month}-${day}`;
+                }
+                return;
+              }
+
+              const ubbMatch = cleanPart.match(/^UBB:(.+)$/i);
+              if (ubbMatch) {
+                ubbCode = ubbMatch[1].trim();
+              }
+            });
+
+            if (!serialLotNumber && descriptionCell) {
+              serialLotNumber = descriptionCell;
+            }
           }
+
+          if (!materialName || quantity <= 0) continue;
 
           const stockItem: StockItem = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -132,178 +228,230 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
   });
 };
 
-// Vaka kayýtlarýndan implant listesi dýþa aktar (hazýr Excel þablonu ile)
-export const exportImplantList = (
+// Vaka kayıtlarından implant listesi dışa aktar
+export const exportImplantList = async (
   cases: CaseRecord[],
   currentUser: string,
-  filename: string = 'implant_list.xlsx',
+  filename: string = "implant_listesi.xlsx",
   templateData?: ArrayBuffer | null
 ) => {
-  if (!templateData) {
-    throw new Error('İmplant şablon dosyası seçilmedi');
-  }
-
-  const targetHeaders = [
-    'document date',
-    'customername',
-    'implanter',
-    'patient',
-    'material name',
-    'quantity',
-    'serial no #',
-  ];
-
-  const workbook = XLSX.read(templateData, { type: 'array' });
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  if (!worksheet) {
-    throw new Error('Şablon sayfası okunamadı');
-  }
-
-  const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
-  const normalize = (value: any) => value?.toString().trim().toLowerCase();
-  const matchesHeader = (cell: any, target: string) => {
-    const norm = normalize(cell);
-    if (!norm) return false;
-    if (norm === target) return true;
-    return norm.replace(/\s+/g, '') === target.replace(/\s+/g, '');
-  };
-
-  const headerRowIndex = rows.findIndex((row) => {
-    const hits = targetHeaders.filter((h) =>
-      row.some((cell: any) => matchesHeader(cell, h))
-    );
-    return hits.length >= 3;
-  });
-
-  const headerRow = headerRowIndex >= 0 ? rows[headerRowIndex] : rows[0] || [];
-  const headerMap: Record<string, number> = {};
-  targetHeaders.forEach((h) => {
-    const idx = headerRow.findIndex((cell: any) => matchesHeader(cell, h));
-    if (idx >= 0) headerMap[h] = idx;
-  });
-
-  if (Object.keys(headerMap).length < 4) {
-    throw new Error('Şablon beklenen sütun başlıklarını içermiyor');
-  }
-
-  const findFirstEmptyRow = () => {
-    for (let r = (headerRowIndex >= 0 ? headerRowIndex + 1 : 1); r < rows.length; r++) {
-      const row = rows[r] || [];
-      const hasData = targetHeaders.some((h) => {
-        const c = headerMap[h];
-        if (c === undefined) return false;
-        const value = row[c];
-        return value !== '' && value !== undefined && value !== null;
-      });
-      if (!hasData) return r;
+  try {
+    if (!templateData) {
+      throw new Error("İmplant şablon dosyası seçilmedi");
     }
-    return rows.length;
-  };
 
-  const startRow = findFirstEmptyRow();
-  const buildEntries = () =>
-    cases.flatMap((caseRecord) =>
-      caseRecord.materials.map((m) => ({
-        'Document Date': caseRecord.date,
-        CustomerName: caseRecord.hospitalName,
-        Implanter: caseRecord.doctorName,
-        Patient: caseRecord.patientName,
-        'Material Name': m.materialName,
-        Quantity: m.quantity,
-        'Serial No #': m.serialLotNumber,
+    const targetHeaders = [
+      "document date",
+      "customername",
+      "implanter",
+      "patient",
+      "material name",
+      "quantity",
+      "serial no #",
+    ];
+
+    const workbook = XLSX.read(templateData, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) {
+      throw new Error("Şablon sayfası okunamadı");
+    }
+
+    const rows = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: "",
+    }) as any[][];
+
+    const normalize = (v: any) => v?.toString().trim().toLowerCase();
+    const matchesHeader = (cell: any, target: string) => {
+      const n = normalize(cell);
+      if (!n) return false;
+      return n === target || n.replace(/\s+/g, "") === target.replace(/\s+/g, "");
+    };
+
+    const headerRowIndex = rows.findIndex((row) =>
+      targetHeaders.filter((h) =>
+        row.some((cell) => matchesHeader(cell, h))
+      ).length >= 3
+    );
+
+    const headerRow = headerRowIndex >= 0 ? rows[headerRowIndex] : rows[0] || [];
+    const headerMap: Record<string, number> = {};
+
+    targetHeaders.forEach((h) => {
+      const idx = headerRow.findIndex((c) => matchesHeader(c, h));
+      if (idx >= 0) headerMap[h] = idx;
+    });
+
+    if (Object.keys(headerMap).length < 4) {
+      throw new Error("Şablon beklenen sütun başlıklarını içermiyor");
+    }
+
+    const startRow =
+      headerRowIndex >= 0 ? headerRowIndex + 1 : rows.length;
+
+    const entries = cases.flatMap((c) =>
+      c.materials.map((m) => ({
+        documentDate: c.date,
+        customerName: c.hospitalName,
+        implanter: c.doctorName,
+        patient: c.patientName,
+        materialName: m.materialName,
+        quantity: m.quantity,
+        serialNo: m.serialLotNumber,
       }))
     );
 
-  const entries = buildEntries();
-  if (entries.length === 0) {
-    throw new Error('Aktarılacak vaka verisi bulunamadı');
-  }
+    if (entries.length === 0) {
+      throw new Error("Aktarılacak vaka verisi bulunamadı");
+    }
 
-  const valueKeyMap: Record<string, string> = {
-    'document date': 'Document Date',
-    customername: 'CustomerName',
-    implanter: 'Implanter',
-    patient: 'Patient',
-    'material name': 'Material Name',
-    quantity: 'Quantity',
-    'serial no #': 'Serial No #',
-  };
+    entries.forEach((e, i) => {
+      const r = startRow + i;
 
-  entries.forEach((entry, idx) => {
-    const rowNumber = startRow + idx;
-    targetHeaders.forEach((key) => {
-      const colIndex = headerMap[key];
-      if (colIndex === undefined) return;
-      const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: rowNumber });
-      const valueKey = valueKeyMap[key];
-      const value = valueKey ? (entry as any)[valueKey] ?? '' : '';
+      const set = (key: string, value: any, type: "s" | "n" = "s") => {
+        const c = headerMap[key];
+        if (c === undefined) return;
+        const addr = XLSX.utils.encode_cell({ r, c });
+        worksheet[addr] = { t: type, v: value ?? "" };
+      };
 
-      if (key === 'quantity' && typeof value === 'number') {
-        worksheet[cellAddress] = { t: 'n', v: value };
-      } else {
-        worksheet[cellAddress] = { t: 's', v: value };
-      }
+      set("document date", e.documentDate);
+      set("customername", e.customerName);
+      set("implanter", e.implanter);
+      set("patient", e.patient);
+      set("material name", e.materialName);
+      set("quantity", e.quantity, "n");
+      set("serial no #", e.serialNo);
     });
-  });
 
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-  range.e.r = Math.max(range.e.r, startRow + entries.length - 1);
-  worksheet['!ref'] = XLSX.utils.encode_range(range);
+    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+    range.e.r = Math.max(range.e.r, startRow + entries.length - 1);
+    worksheet["!ref"] = XLSX.utils.encode_range(range);
 
-  // Tarihi tabloya yazarken sadece hücreleri dolduruyoruz, diğer sütunlar şablondaki gibi kalıyor
-  XLSX.writeFile(workbook, filename);
+    /* 🌐 WEB: Direkt indir */
+    if (Capacitor.getPlatform() === "web") {
+      XLSX.writeFile(workbook, filename);
+      return { 
+        success: true, 
+        message: "Dosya başarıyla indirildi", 
+        uri: null 
+      };
+    }
+
+    /* 📱 MOBILE: */
+    if (Capacitor.getPlatform() !== "web") {
+      // Base64 formatında Excel dosyasını oluştur
+      const base64 = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "base64",
+      });
+
+      // Önce Cache'e kaydet
+      const timestamp = new Date().toISOString()
+        .slice(0, 19)
+        .replace(/[:]/g, "-")
+        .replace("T", "_");
+      const finalFilename = `implant_listesi_${timestamp}.xlsx`;
+
+      const tempFile = await Filesystem.writeFile({
+        path: finalFilename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      // Sonra External Storage'ın Download klasörüne kopyala
+      const downloadPath = `Download/${finalFilename}`;
+      await Filesystem.writeFile({
+        path: downloadPath,
+        data: base64,
+        directory: Directory.ExternalStorage,
+      });
+
+      const successMessage = `İmplant listesi başarıyla Download klasörüne kaydedildi: ${downloadPath}`;
+
+      return {
+        success: true,
+        message: successMessage,
+        uri: downloadPath
+      };
+    }
+  } catch (error) {
+    console.error("İmplant listesi export hatası:", error);
+    return { 
+      success: false, 
+      message: (error as Error).message || "Bilinmeyen bir hata oluştu", 
+      uri: null 
+    };
+  }
 };
 
 // Stok verilerini Excel'e aktar
-export const exportToExcel = (stockItems: StockItem[], filename: string = "stok_listesi.xlsx") => {
-  const excelData = stockItems.map((item, index) => {
-    const descriptionParts: string[] = [];
-
-    if (item.serialLotNumber) {
-      const isNumericOnly = /^\d+$/.test(item.serialLotNumber);
-      if (isNumericOnly) {
-        descriptionParts.push(`SERI:${item.serialLotNumber}`);
-      } else {
-        descriptionParts.push(`LOT:${item.serialLotNumber}`);
-      }
-    }
-
-    if (item.expiryDate) {
-      const date = new Date(item.expiryDate);
-      const formattedDate = `${date.getDate().toString().padStart(2, "0")}.${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}.${date.getFullYear()}`;
-      descriptionParts.push(`SKT:${formattedDate}`);
-    }
-
-    if (item.ubbCode) {
-      descriptionParts.push(`UBB:${item.ubbCode}`);
-    }
-
-    const description = descriptionParts.join("\\");
-
-    return {
-      "Sıra": index + 1,
-      "Malzeme": item.materialCode || "",
+export const exportToExcel = async (
+  stockItems: StockItem[],
+  filename: string = "stok_listesi.xlsx"
+) => {
+  try {
+    const excelData = stockItems.map((item, index) => ({
+      "Sıra No": index + 1,
+      "Malzeme Kodu": item.materialCode || "",
       "Malzeme Açıklaması": item.materialName,
-      "Açıklama": description,
+      "UBB KODU": item.ubbCode || "",
+      "Seri/Lot No": item.serialLotNumber || "",
+      "S.K.T": item.expiryDate ? (() => {
+        const d = new Date(item.expiryDate);
+        return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}`;
+      })() : "",
       "Miktar": item.quantity,
-    };
-  });
+    }));
 
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-  worksheet["!cols"] = [
-    { wch: 8 },
-    { wch: 15 },
-    { wch: 30 },
-    { wch: 50 },
-    { wch: 10 },
-  ];
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    worksheet["!cols"] = [
+      { wch: 8 },   // Sıra No
+      { wch: 15 },  // Malzeme Kodu
+      { wch: 30 },  // Malzeme Açıklaması
+      { wch: 20 },  // UBB KODU
+      { wch: 15 },  // Seri/Lot No
+      { wch: 12 },  // S.K.T
+      { wch: 10 },  // Miktar
+    ];
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Stok Listesi");
-  XLSX.writeFile(workbook, filename);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sayfa1");
+
+    if (Capacitor.getPlatform() === "web") {
+      XLSX.writeFile(workbook, filename);
+      return;
+    }
+
+    if (Capacitor.getPlatform() !== "web") {
+      const base64 = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "base64",
+      });
+
+      // Önce Cache'e kaydet
+      const tempFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      // Sonra External Storage'ın Download klasörüne kopyala
+      const downloadPath = `Download/${filename}`;
+      await Filesystem.writeFile({
+        path: downloadPath,
+        data: base64,
+        directory: Directory.ExternalStorage,
+      });
+
+      alert(`Excel dosyası başarıyla Download klasörüne kaydedildi: ${downloadPath}`);
+    }
+
+  } catch (error) {
+    console.error("Excel export error:", error);
+    alert("Excel dosyası kaydedilirken hata oluştu: " + (error as Error).message);
+  }
 };
 
 // Kontrol listesi için Excel'den hasta verisi içe aktar

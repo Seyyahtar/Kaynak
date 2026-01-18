@@ -1,5 +1,13 @@
 {
   "appId": "com.stok.app",
   "appName": "S-Tok",
-  "webDir": "build"
+  "webDir": "build",
+  "android": {
+    "buildOptions": {
+      "keystorePath": "app/key.jks",
+      "keystorePassword": "37914456",
+      "keystoreAlias": "stokkey",
+      "keystoreAliasPassword": "37914456"
+    }
+  }
 }
