@@ -9,6 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Page, HistoryRecord, CaseRecord } from '../types';
 import { storage } from '../utils/storage';
 import { toast } from 'sonner@2.0.3';
+import html2pdf from 'html2pdf.js';
+import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
 interface HistoryPageProps {
   onNavigate: (page: Page) => void;
@@ -34,116 +38,262 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     setHistory(data);
   };
 
-  const exportCasePdf = (record: HistoryRecord) => {
+  const shareCasePdf = async (record: HistoryRecord) => {
     if (record.type !== 'case' || !record.details) return;
     const details = record.details as CaseRecord;
 
-    const html = `
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Vaka Kartı - ${details.patientName}</title>
-          <style>
-            @media print { body { -webkit-print-color-adjust: exact; } }
-            :root {
-              --bg: #000000ff;
-              --muted: #2a84faff;
-              --text: #000000ff;
-              --accent: #000000ff;
-              --accent-soft: rgba(72, 72, 72, 1);
-            }
-            * { box-sizing: border-box; }
-            body { font-family: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif; background: var(--bg); padding: 32px; color: var(--text); }
-            .page { max-width: 960px; margin: 0 auto; }
-            .card { background: linear-gradient(145deg, rgba(255, 255, 255, 0), rgba(255,255,255,0)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
-            .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
-            .chip { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: #ede9fe; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; font-size: 12px; }
-            .title { font-size: 26px; font-weight: 800; margin: 6px 0 0 0; }
-            .meta { color: var(--muted); font-size: 14px; }
-            .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 14px 0 10px; }
-            .field { padding: 14px; border: 1px solid rgba(93, 91, 91, 0.55); border-radius: 14px; background: rgba(255,255,255,0.02); }
-            .label { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
-            .value { font-size: 16px; font-weight: 700; color: var(--text); }
-            .section { margin-top: 18px; }
-            .section-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
-            .pill { padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0); color: var(--muted); font-size: 12px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid rgba(255,255,255,0.06); }
-            th, td { text-align: left; padding: 12px 10px; }
-            th { background: rgba(255,255,255,0.05); font-size: 12px; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
-            tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
-            tr:hover td { background: rgba(255, 255, 255, 0); }
-            .note { margin-top: 6px; padding: 14px; border-radius: 14px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); color: #ede9fe; }
-          </style>
-        </head>
-        <body>
-          <div class="page">
-            <div class="card">
-              <div class="header">
-              </div>
-              <div class="grid">
-                <div class="field">
-                  <div class="label">Hasta</div>
-                  <div class="value">${details.patientName}</div>
-                </div>
-                <div class="field">
-                  <div class="label">Hastane</div>
-                  <div class="value">${details.hospitalName}</div>
-                </div>
-                <div class="field">
-                  <div class="label">Doktor</div>
-                  <div class="value">${details.doctorName}</div>
-                </div>
-                <div class="field">
-                  <div class="label">Tarih</div>
-                  <div class="value">${new Date(details.date).toLocaleDateString('tr-TR')}</div>
-                </div>
-              </div>
-
-              ${details.notes ? `<div class="section"><div class="section-title">Notlar</div><div class="note">${details.notes}</div></div>` : ''}
-
-              <div class="section">
-                <div class="section-title">
-                  Kullanılan Malzemeler
-                  <span class="pill">${(details.materials || []).length} adet</span>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Malzeme</th>
-                      <th>Seri / Lot</th>
-                      <th>UBB</th>
-                      <th>Adet</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${(details.materials || []).map((m, idx) => `
-                      <tr>
-                        <td>${idx + 1}</td>
-                        <td>${m.materialName}</td>
-                        <td>${m.serialLotNumber}</td>
-                        <td>${m.ubbCode || '-'}</td>
-                        <td>${m.quantity}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
+    const htmlContent = `
+      <div class="page">
+        <div class="card">
+          <div class="header">
+          </div>
+          <div class="grid">
+            <div class="field">
+              <div class="label">Hasta</div>
+              <div class="value">${details.patientName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Hastane</div>
+              <div class="value">${details.hospitalName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Doktor</div>
+              <div class="value">${details.doctorName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Tarih</div>
+              <div class="value">${new Date(details.date).toLocaleDateString('tr-TR')}</div>
             </div>
           </div>
-          <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 400); };</script>
-        </body>
-      </html>
+
+          ${details.notes ? `<div class="section"><div class="section-title">Notlar</div><div class="note">${details.notes}</div></div>` : ''}
+
+          <div class="section">
+            <div class="section-title">
+              Kullanılan Malzemeler
+              <span class="pill">${(details.materials || []).length} adet</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Malzeme</th>
+                  <th>Seri / Lot</th>
+                  <th>UBB</th>
+                  <th>Adet</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(details.materials || []).map((m, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${m.materialName}</td>
+                    <td>${m.serialLotNumber}</td>
+                    <td>${m.ubbCode || '-'}</td>
+                    <td>${m.quantity}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     `;
 
-    const w = window.open('', '_blank');
-    if (!w) {
-      toast.error('PDF açılırken bir hata oluştu (pop-up engeli olabilir)');
-      return;
+    const styles = `
+      @media print { body { -webkit-print-color-adjust: exact; } }
+      :root {
+        --bg: #000000ff;
+        --muted: #2a84faff;
+        --text: #000000ff;
+        --accent: #000000ff;
+        --accent-soft: rgba(72, 72, 72, 1);
+      }
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif; background: var(--bg); padding: 32px; color: var(--text); }
+      .page { max-width: 960px; margin: 0 auto; }
+      .card { background: linear-gradient(145deg, rgba(255, 255, 255, 0), rgba(255,255,255,0)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+      .chip { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: #ede9fe; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; font-size: 12px; }
+      .title { font-size: 26px; font-weight: 800; margin: 6px 0 0 0; }
+      .meta { color: var(--muted); font-size: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 14px 0 10px; }
+      .field { padding: 14px; border: 1px solid rgba(93, 91, 91, 0.55); border-radius: 14px; background: rgba(255,255,255,0.02); }
+      .label { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+      .value { font-size: 16px; font-weight: 700; color: var(--text); }
+      .section { margin-top: 18px; }
+      .section-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+      .pill { padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0); color: var(--muted); font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid rgba(255,255,255,0.06); }
+      th, td { text-align: left; padding: 12px 10px; }
+      th { background: rgba(255,255,255,0.05); font-size: 12px; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
+      tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+      tr:hover td { background: rgba(255, 255, 255, 0); }
+      .note { margin-top: 6px; padding: 14px; border-radius: 14px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); color: #ede9fe; }
+    `;
+
+    const element = document.createElement('div');
+    element.innerHTML = `<style>${styles}</style>${htmlContent}`;
+
+    try {
+      const pdfBlob = await html2pdf().set({ margin: 1, filename: `vaka-karti-${details.patientName}.pdf` }).from(element).outputPdf('blob');
+      
+      if (Capacitor.getPlatform() === 'web') {
+        // Web için navigator.share varsa kullan, yoksa download
+        if (navigator.share) {
+          const file = new File([pdfBlob], `vaka-karti-${details.patientName}.pdf`, { type: 'application/pdf' });
+          await navigator.share({ files: [file] });
+        } else {
+          const url = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `vaka-karti-${details.patientName}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      } else {
+        // Mobil için Filesystem ile geçici dosya oluştur ve paylaş
+        const base64 = await blobToBase64(pdfBlob);
+        const filename = `vaka-karti-${details.patientName}.pdf`;
+        const tempFile = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        });
+        const fileUri = tempFile.uri;
+        await Share.share({
+          title: 'Vaka Kartı',
+          files: [fileUri],
+        });
+      }
+    } catch (error) {
+      toast.error('PDF paylaşılırken hata oluştu: ' + (error as Error).message);
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+  };
+
+  const downloadCasePdf = async (record: HistoryRecord) => {
+    if (record.type !== 'case' || !record.details) return;
+    const details = record.details as CaseRecord;
+
+    const htmlContent = `
+      <div class="page">
+        <div class="card">
+          <div class="header">
+          </div>
+          <div class="grid">
+            <div class="field">
+              <div class="label">Hasta</div>
+              <div class="value">${details.patientName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Hastane</div>
+              <div class="value">${details.hospitalName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Doktor</div>
+              <div class="value">${details.doctorName}</div>
+            </div>
+            <div class="field">
+              <div class="label">Tarih</div>
+              <div class="value">${new Date(details.date).toLocaleDateString('tr-TR')}</div>
+            </div>
+          </div>
+
+          ${details.notes ? `<div class="section"><div class="section-title">Notlar</div><div class="note">${details.notes}</div></div>` : ''}
+
+          <div class="section">
+            <div class="section-title">
+              Kullanılan Malzemeler
+              <span class="pill">${(details.materials || []).length} adet</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Malzeme</th>
+                  <th>Seri / Lot</th>
+                  <th>UBB</th>
+                  <th>Adet</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(details.materials || []).map((m, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${m.materialName}</td>
+                    <td>${m.serialLotNumber}</td>
+                    <td>${m.ubbCode || '-'}</td>
+                    <td>${m.quantity}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const styles = `
+      @media print { body { -webkit-print-color-adjust: exact; } }
+      :root {
+        --bg: #000000ff;
+        --muted: #2a84faff;
+        --text: #000000ff;
+        --accent: #000000ff;
+        --accent-soft: rgba(72, 72, 72, 1);
+      }
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif; background: var(--bg); padding: 32px; color: var(--text); }
+      .page { max-width: 960px; margin: 0 auto; }
+      .card { background: linear-gradient(145deg, rgba(255, 255, 255, 0), rgba(255,255,255,0)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+      .chip { padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: #ede9fe; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; font-size: 12px; }
+      .title { font-size: 26px; font-weight: 800; margin: 6px 0 0 0; }
+      .meta { color: var(--muted); font-size: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 14px 0 10px; }
+      .field { padding: 14px; border: 1px solid rgba(93, 91, 91, 0.55); border-radius: 14px; background: rgba(255,255,255,0.02); }
+      .label { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+      .value { font-size: 16px; font-weight: 700; color: var(--text); }
+      .section { margin-top: 18px; }
+      .section-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+      .pill { padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0); color: var(--muted); font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid rgba(255,255,255,0.06); }
+      th, td { text-align: left; padding: 12px 10px; }
+      th { background: rgba(255,255,255,0.05); font-size: 12px; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; }
+      tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+      tr:hover td { background: rgba(255, 255, 255, 0); }
+      .note { margin-top: 6px; padding: 14px; border-radius: 14px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); color: #ede9fe; }
+    `;
+
+    const element = document.createElement('div');
+    element.innerHTML = `<style>${styles}</style>${htmlContent}`;
+
+    try {
+      if (Capacitor.getPlatform() === 'web') {
+        await html2pdf().set({ margin: 1, filename: `vaka-karti-${details.patientName}.pdf` }).from(element).save();
+      } else {
+        const pdfBlob = await html2pdf().set({ margin: 1 }).from(element).outputPdf('blob');
+        const base64 = await blobToBase64(pdfBlob);
+        const filename = `vaka-karti-${details.patientName}.pdf`;
+        await Filesystem.writeFile({
+          path: `Download/${filename}`,
+          data: base64,
+          directory: Directory.ExternalStorage,
+        });
+        toast.success(`PDF başarıyla Download klasörüne kaydedildi: ${filename}`);
+      }
+    } catch (error) {
+      toast.error('PDF indirilirken hata oluştu: ' + (error as Error).message);
+    }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   };
 
   const filteredHistory = React.useMemo(() => {
@@ -562,16 +712,24 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
                       <Eye className="w-4 h-4" />
                     </Button>
                     {record.type === 'case' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center gap-1"
-                        onClick={() => exportCasePdf(record)}
-                        title="Vaka kartını dışa aktar"
-                      >
-                        <FileText className="w-4 h-4" />
-                        Vaka Kartı
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => shareCasePdf(record)}
+                          title="Vaka kartını paylaş"
+                        >
+                          <img src="/share-2.svg" alt="Paylaş" className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => downloadCasePdf(record)}
+                          title="Vaka kartını indir"
+                        >
+                          <img src="/download.svg" alt="İndir" className="w-4 h-4" />
+                        </Button>
+                      </>
                     )}
                     {record.type !== 'checklist' && (
                       <Button
