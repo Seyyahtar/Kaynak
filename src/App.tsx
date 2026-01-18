@@ -10,6 +10,7 @@ import HistoryPage from './components/HistoryPage';
 import SettingsPage from './components/SettingsPage';
 import { Page, StockItem } from './types';
 import { storage } from './utils/storage';
+import { App as CapacitorApp } from '@capacitor/app';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -23,6 +24,21 @@ export default function App() {
       setCurrentUser(user.username);
     }
   }, []);
+
+  useEffect(() => {
+    // Android geri butonu için listener
+    const backButtonListener = CapacitorApp.addListener('backButton', () => {
+      if (currentPage !== 'home') {
+        setCurrentPage('home');
+      } else {
+        CapacitorApp.exitApp();
+      }
+    });
+
+    return () => {
+      backButtonListener.remove();
+    };
+  }, [currentPage]);
 
   const handleLogin = (username: string) => {
     setCurrentUser(username);
