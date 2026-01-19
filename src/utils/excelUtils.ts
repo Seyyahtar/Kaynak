@@ -1,6 +1,6 @@
 ﻿// Excel işlemleri için yardımcı fonksiyonlar
 import * as XLSX from "xlsx";
-import { StockItem, ChecklistPatient, CaseRecord } from "../types";
+import { StockItem, ChecklistPatient, CaseRecord, HistoryRecord, ChecklistRecord } from "../types";
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from "@capacitor/core";
@@ -89,7 +89,12 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
             // Çıktı Tablosu formatı
             materialCode = row[findIndex("malzeme kodu", 1)]?.toString().trim() || "";
             materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
-            ubbCode = row[findIndex("ubb kodu", 3)]?.toString().trim() || "";
+
+            const ubbIndex = header.indexOf("ubb kodu");
+            ubbCode = ubbIndex >= 0
+             ? row[ubbIndex]?.toString().trim() || ""
+             : "";
+
             serialLotNumber = row[findIndex("seri/lot no", 4)]?.toString().trim() || "";
             const expiryDateRaw = row[findIndex("s.k.t", 5)];
             expiryDate = excelDateToJSDate(expiryDateRaw);
@@ -99,7 +104,12 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
             // 2.Tip Veri Tablosu formatı
             materialCode = row[findIndex("malzeme kodu", 1)]?.toString().trim() || "";
             materialName = row[findIndex("malzeme açıklaması", 2)]?.toString().trim() || "";
-            ubbCode = row[findIndex("ubb kodu", 3)]?.toString().trim() || "";
+
+            const ubbIndex = header.indexOf("ubb kodu");
+            ubbCode = ubbIndex >= 0
+              ? row[ubbIndex]?.toString().trim() || ""
+             : "";
+
             const descriptionCell = row[findIndex("açıklama", 4)]?.toString().trim() || "";
             quantity = parseQuantity(row[findIndex("miktar", 5)]);
 
@@ -523,4 +533,152 @@ export const importChecklistFromExcel = (file: File): Promise<ChecklistPatient[]
 
     reader.readAsBinaryString(file);
   });
+};
+export const exportHistoryToExcel = async (
+  historyRecords: HistoryRecord[],
+  filename: string = "gecmis_kayitlari.xlsx"
+) => {
+  try {
+    const excelData = historyRecords.map((record, index) => ({
+      "Sıra No" : index + 1,
+      "Tarih" : new Date(record.date).toLocaleDateString('tr-TR'),
+      "Tür" : record.type === 'stock-add' ? 'Stok Ekleme' :
+             record.type === 'stock-remove' ? 'Stok Çıkarma' :
+             record.type === 'stock-delete' ? 'Stok Silme' :
+             record.type === 'case' ? 'Vaka' :
+             record.type === 'checklist' ? 'Kontrol Listesi' : record.type,
+      "Açıklama" : record.description,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    worksheet["!cols"] = [
+      { wch: 8 },   // Sıra No
+      { wch: 12 },  // Tarih
+      { wch: 15 },  // Tür
+      { wch: 50 },  // Açıklama
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Geçmiş Kayıtları");
+
+    if (Capacitor.getPlatform() === "web") {
+      XLSX.writeFile(workbook, filename);
+      return;
+    }
+
+    if (Capacitor.getPlatform() !== "web") {
+      const base64 = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "base64",
+      });
+
+      // Önce Cache'e kaydet
+      const tempFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      // Sonra External Storage'ın Download klasörüne kopyala
+      const downloadPath = "Download/";
+      await Filesystem.writeFile({
+        path: downloadPath,
+        data: base64,
+        directory: Directory.ExternalStorage,
+      });
+
+      alert(`Geçmiş kayıtları başarıyla Download klasörüne kaydedildi: ${downloadPath}`);
+    }
+
+  } catch (error) {
+    throw new Error('Excel dışa aktarma hatası: ' + (error as Error).message);
+  }
+};
+
+
+export const shareHistoryToExcel = async (
+  historyRecords: HistoryRecord[]
+) => {
+  try {
+    const excelData = historyRecords.map((record, index) => {
+      let details = "";
+
+      if (record.details) {
+        if (record.type === "stock-add" || record.type === "stock-remove" || record.type === "stock-delete") {
+          const item = record.details as StockItem;
+          details = `Malzeme: ${item.materialName}, Seri/Lot: ${item.serialLotNumber}, UBB: ${item.ubbCode || "-"}, SKT: ${item.expiryDate}, Miktar: ${item.quantity}`;
+          if (item.from) details += `, Kimden: ${item.from}`;
+          if (item.to) details += `, Kime: ${item.to}`;
+        } else if (record.type === "case") {
+          const caseData = record.details as CaseRecord;
+          details = `Hasta: ${caseData.patientName}, Hastane: ${caseData.hospitalName}, Doktor: ${caseData.doctorName}`;
+          if (caseData.notes) details += `, Notlar: ${caseData.notes}`;
+          if (caseData.materials && caseData.materials.length > 0) {
+            details += `, Malzemeler: ${caseData.materials.map(m => `${m.materialName} (${m.quantity})`).join(", ")}`;
+          }
+        } else if (record.type === "checklist") {
+          const checklist = record.details as ChecklistRecord;
+          const checkedCount = checklist.patients.filter(p => p.checked).length;
+          details = `Başlık: ${checklist.title}, Toplam Hasta: ${checklist.patients.length}, Kontrol Edilen: ${checkedCount}`;
+        }
+      }
+
+      return {
+        "Sıra No": index + 1,
+        "Tarih": new Date(record.date).toLocaleDateString("tr-TR"),
+        "Tür": record.type === "stock-add" ? "Stok Ekleme" :
+               record.type === "stock-remove" ? "Stok Çıkarma" :
+               record.type === "stock-delete" ? "Stok Silme" :
+               record.type === "case" ? "Vaka" :
+               record.type === "checklist" ? "Kontrol Listesi" : record.type,
+        "Açıklama": record.description,
+        "Detaylar": details,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    worksheet["!cols"] = [
+      { wch: 8 },   // Sıra No
+      { wch: 12 },  // Tarih
+      { wch: 15 },  // Tür
+      { wch: 50 },  // Açıklama
+      { wch: 100 }, // Detaylar
+    ];
+
+        const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Geçmiş Kayıtları");
+
+    const base64 = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "base64",
+    });
+
+    const filename = `gecmis_kayitlari_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    if (Capacitor.getPlatform() === "web") {
+      // Web için blob oluştur ve download
+      const blob = new Blob([Uint8Array.from(atob(base64), c => c.charCodeAt(0))], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // Mobil için Cache"e kaydet ve paylaş
+      const tempFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+      const fileUri = tempFile.uri;
+      await Share.share({
+        title: "Geçmiş Kayıtları",
+        files: [fileUri],
+      });
+    }
+
+  } catch (error) {
+    throw new Error("Excel paylaşma hatası: " + (error as Error).message);
+  }
 };

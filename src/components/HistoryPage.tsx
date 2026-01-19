@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Eye, FileText, Filter, Undo } from 'lucide-react';
+import { ArrowLeft, Eye, FileText, Filter, Undo, Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
@@ -13,6 +13,9 @@ import html2pdf from 'html2pdf.js';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import shareIcon from '../../assets/icons/share-2.svg';
+import downloadIcon from '../../assets/icons/download.svg';
+import { exportHistoryToExcel, shareHistoryToExcel } from '../utils/excelUtils';
 
 interface HistoryPageProps {
   onNavigate: (page: Page) => void;
@@ -21,6 +24,7 @@ interface HistoryPageProps {
 export default function HistoryPage({ onNavigate }: HistoryPageProps) {
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<HistoryRecord | null>(null);
   const [filters, setFilters] = useState({
@@ -36,6 +40,24 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
   const loadHistory = () => {
     const data = storage.getHistory();
     setHistory(data);
+  };
+
+  const handleDownloadHistory = async () => {
+    try {
+      await exportHistoryToExcel(filteredHistory);
+      toast.success('Geçmiş kayıtları indirildi');
+    } catch (error) {
+      toast.error('İndirme hatası: ' + (error as Error).message);
+    }
+  };
+
+  const handleShareHistory = async () => {
+    try {
+      await shareHistoryToExcel(filteredHistory);
+      toast.success('Geçmiş kayıtları paylaşıldı');
+    } catch (error) {
+      toast.error('Paylaşım hatası: ' + (error as Error).message);
+    }
   };
 
   const shareCasePdf = async (record: HistoryRecord) => {
@@ -617,6 +639,14 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white hover:bg-purple-700"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setFilterOpen(!filterOpen)}
             className="text-white hover:bg-purple-700"
           >
@@ -674,6 +704,47 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
           >
             Filtreleri Temizle
           </Button>
+        </Card>
+      )}
+
+      {menuOpen && (
+        <Card className="m-4 p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600">Başlangıç tarihi</Label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600">Bitiş tarihi</Label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Button
+              className="w-full justify-start"
+              variant="outline"
+              onClick={handleDownloadHistory}
+            >
+              <img src="/download.svg" alt="İndir" className="w-4 h-4 mr-2" />
+              Geçmiş Verilerini İndir
+            </Button>
+            <Button
+              className="w-full justify-start"
+              variant="outline"
+              onClick={handleShareHistory}
+            >
+              <img src="/share-2.svg" alt="Paylaş" className="w-4 h-4 mr-2" />
+              Geçmiş Verilerini Paylaş
+            </Button>
+          </div>
         </Card>
       )}
 
