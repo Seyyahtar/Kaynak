@@ -46,7 +46,7 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
   const isRemoving = formData.from === currentUser;
   const isAdding = formData.to === currentUser;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.materialName || !formData.serialLotNumber || !formData.quantity) {
@@ -62,11 +62,11 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
 
     if (isAdding) {
       // Stok ekle - önce duplicate kontrolü
-      if (storage.checkDuplicate(formData.materialName, formData.serialLotNumber)) {
+      if (await storage.checkDuplicate(formData.materialName, formData.serialLotNumber)) {
         toast.error('Bu malzeme ve seri/lot numarası zaten stokta kayıtlı!');
         return;
       }
-      
+
       const newItem: StockItem = {
         id: Date.now().toString(),
         materialName: formData.materialName,
@@ -79,8 +79,8 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
         to: formData.to,
       };
 
-      storage.addStock(newItem);
-      storage.addHistory({
+      await storage.addStock(newItem);
+      await storage.addHistory({
         id: Date.now().toString(),
         date: formData.date,
         type: 'stock-add',
@@ -91,13 +91,13 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
       toast.success('Stok başarıyla eklendi');
     } else if (isRemoving) {
       // Stok çıkar
-      storage.removeStock([{
+      await storage.removeStock([{
         materialName: formData.materialName,
         serialLotNumber: formData.serialLotNumber,
         quantity: quantity,
       }]);
-      
-      storage.addHistory({
+
+      await storage.addHistory({
         id: Date.now().toString(),
         date: formData.date,
         type: 'stock-remove',
@@ -122,7 +122,7 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
       expiryDate: '',
       quantity: '',
     });
-    
+
     onNavigate('stock');
   };
 
@@ -147,7 +147,7 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
         <Card className="p-6">
           <div className="mb-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-slate-700">
-              <strong>Not:</strong> "Kimden" alanına kendi adınızı ({currentUser}) yazarsanız stok çıkar. 
+              <strong>Not:</strong> "Kimden" alanına kendi adınızı ({currentUser}) yazarsanız stok çıkar.
               "Kime" alanına kendi adınızı yazarsanız stok ekler.
             </p>
           </div>

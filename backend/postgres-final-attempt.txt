@@ -1,0 +1,133 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.stok:stok-yonetim-backend >--------------------
+[INFO] Building Stok Y÷netim Backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ stok-yonetim-backend ---
+[INFO] Deleting D:\GitHub\Kaynak\backend\target
+[INFO] 
+[INFO] >>> spring-boot:3.2.1:run (default-cli) > test-compile @ stok-yonetim-backend >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ stok-yonetim-backend ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ stok-yonetim-backend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 38 source files with javac [debug release 17] to target\classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ stok-yonetim-backend ---
+[INFO] skip non existing resourceDirectory D:\GitHub\Kaynak\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ stok-yonetim-backend ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] 
+[INFO] <<< spring-boot:3.2.1:run (default-cli) < test-compile @ stok-yonetim-backend <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.2.1:run (default-cli) @ stok-yonetim-backend ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-20T21:51:16.794+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.stok.app.StokApplication             : Starting StokApplication using Java 21.0.9 with PID 23056 (D:\GitHub\Kaynak\backend\target\classes started by Madenci in D:\GitHub\Kaynak\backend)
+2026-01-20T21:51:16.796+03:00 DEBUG 23056 --- [stok-yonetim-backend] [  restartedMain] com.stok.app.StokApplication             : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-20T21:51:16.796+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.stok.app.StokApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-01-20T21:51:16.825+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-01-20T21:51:16.825+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-01-20T21:51:17.233+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-20T21:51:17.272+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 34 ms. Found 5 JPA repository interfaces.
+2026-01-20T21:51:17.688+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-01-20T21:51:17.696+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-20T21:51:17.696+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-20T21:51:17.733+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-01-20T21:51:17.733+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 907 ms
+2026-01-20T21:51:17.801+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-01-20T21:51:17.919+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4a699c7d
+2026-01-20T21:51:17.920+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-01-20T21:51:17.963+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-01-20T21:51:17.963+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-01-20T21:51:17.963+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.internal.license.VersionPrinter    : 
+2026-01-20T21:51:17.971+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/stok_yonetim (PostgreSQL 18.1)
+2026-01-20T21:51:17.974+03:00  WARN 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: PostgreSQL 18.1 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-01-20T21:51:17.988+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table "public"."flyway_schema_history" does not exist yet
+2026-01-20T21:51:17.989+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.core.internal.command.DbValidate     : Successfully validated 1 migration (execution time 00:00.009s)
+2026-01-20T21:51:17.996+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table "public"."flyway_schema_history" ...
+2026-01-20T21:51:18.056+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.core.internal.command.DbMigrate      : Current version of schema "public": << Empty Schema >>
+2026-01-20T21:51:18.065+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.core.internal.command.DbMigrate      : Migrating schema "public" to version "1 - initial schema"
+2026-01-20T21:51:18.101+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.f.core.internal.command.DbMigrate      : Successfully applied 1 migration to schema "public", now at version v1 (execution time 00:00.029s)
+2026-01-20T21:51:18.153+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-20T21:51:18.187+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.1.Final
+2026-01-20T21:51:18.208+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-01-20T21:51:18.343+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-20T21:51:18.378+03:00  WARN 23056 --- [stok-yonetim-backend] [  restartedMain] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-20T21:51:19.051+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-20T21:51:19.078+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-20T21:51:19.082+03:00  WARN 23056 --- [stok-yonetim-backend] [  restartedMain] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'corsConfig': Injection of autowired dependencies failed
+2026-01-20T21:51:19.083+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-01-20T21:51:19.085+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-01-20T21:51:19.086+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-01-20T21:51:19.087+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-01-20T21:51:19.095+03:00  INFO 23056 --- [stok-yonetim-backend] [  restartedMain] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-01-20T21:51:19.106+03:00 ERROR 23056 --- [stok-yonetim-backend] [  restartedMain] o.s.boot.SpringApplication               : Application run failed
+
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'corsConfig': Injection of autowired dependencies failed
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.postProcessProperties(AutowiredAnnotationBeanPostProcessor.java:514) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.populateBean(AbstractAutowireCapableBeanFactory.java:1418) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:598) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:960) ~[spring-context-6.1.2.jar:6.1.2]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:625) ~[spring-context-6.1.2.jar:6.1.2]
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) ~[spring-boot-3.2.1.jar:3.2.1]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:762) ~[spring-boot-3.2.1.jar:3.2.1]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:464) ~[spring-boot-3.2.1.jar:3.2.1]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334) ~[spring-boot-3.2.1.jar:3.2.1]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1358) ~[spring-boot-3.2.1.jar:3.2.1]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1347) ~[spring-boot-3.2.1.jar:3.2.1]
+	at com.stok.app.StokApplication.main(StokApplication.java:15) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.springframework.boot.devtools.restart.RestartLauncher.run(RestartLauncher.java:50) ~[spring-boot-devtools-3.2.1.jar:3.2.1]
+Caused by: java.lang.IllegalArgumentException: Could not resolve placeholder 'cors.allowed-origins' in value "${cors.allowed-origins}"
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:180) ~[spring-core-6.1.2.jar:6.1.2]
+	at org.springframework.util.PropertyPlaceholderHelper.replacePlaceholders(PropertyPlaceholderHelper.java:126) ~[spring-core-6.1.2.jar:6.1.2]
+	at org.springframework.core.env.AbstractPropertyResolver.doResolvePlaceholders(AbstractPropertyResolver.java:239) ~[spring-core-6.1.2.jar:6.1.2]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveRequiredPlaceholders(AbstractPropertyResolver.java:210) ~[spring-core-6.1.2.jar:6.1.2]
+	at org.springframework.context.support.PropertySourcesPlaceholderConfigurer.lambda$processProperties$0(PropertySourcesPlaceholderConfigurer.java:200) ~[spring-context-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.resolveEmbeddedValue(AbstractBeanFactory.java:921) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1374) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:784) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.inject(AutowiredAnnotationBeanPostProcessor.java:767) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.annotation.InjectionMetadata.inject(InjectionMetadata.java:145) ~[spring-beans-6.1.2.jar:6.1.2]
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.postProcessProperties(AutowiredAnnotationBeanPostProcessor.java:508) ~[spring-beans-6.1.2.jar:6.1.2]
+	... 20 common frames omitted
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  6.971 s
+[INFO] Finished at: 2026-01-20T21:51:19+03:00
+[INFO] ------------------------------------------------------------------------

@@ -37,8 +37,8 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     loadHistory();
   }, []);
 
-  const loadHistory = () => {
-    const data = storage.getHistory();
+  const loadHistory = async () => {
+    const data = await storage.getHistory();
     setHistory(data);
   };
 
@@ -159,7 +159,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
 
     try {
       const pdfBlob = await html2pdf().set({ margin: 1, filename: `vaka-karti-${details.patientName}.pdf` }).from(element).outputPdf('blob');
-      
+
       if (Capacitor.getPlatform() === 'web') {
         // Web için navigator.share varsa kullan, yoksa download
         if (navigator.share) {
@@ -369,7 +369,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     }
   };
 
-  const handleUndo = (record: HistoryRecord) => {
+  const handleUndo = async (record: HistoryRecord) => {
     if (!window.confirm('Bu işlemi geri almak istediğinizden emin misiniz?')) {
       return;
     }
@@ -378,13 +378,13 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
       if (record.type === 'stock-add') {
         const item = record.details;
         if (item && item.id) {
-          storage.deleteStockItem(item.id);
+          await storage.deleteStockItem(item.id);
           toast.success('Stok ekleme işlemi geri alındı');
         }
       } else if (record.type === 'stock-remove') {
         const item = record.details;
         if (item) {
-          storage.addStock({
+          await storage.addStock({
             id: Date.now().toString(),
             materialName: item.materialName,
             serialLotNumber: item.serialLotNumber,
@@ -400,7 +400,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
       } else if (record.type === 'stock-delete') {
         const item = record.details;
         if (item) {
-          storage.addStock({
+          await storage.addStock({
             id: Date.now().toString(),
             materialName: item.materialName,
             serialLotNumber: item.serialLotNumber,
@@ -416,8 +416,8 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
       } else if (record.type === 'case') {
         const caseDetails = record.details;
         if (caseDetails && caseDetails.materials) {
-          caseDetails.materials.forEach((material: any) => {
-            storage.addStock({
+          for (const material of caseDetails.materials) {
+            await storage.addStock({
               id: Date.now().toString() + Math.random(),
               materialName: material.materialName,
               serialLotNumber: material.serialLotNumber,
@@ -428,12 +428,12 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
               from: '',
               to: '',
             });
-          });
+          }
           toast.success('Vaka işlemi geri alındı, malzemeler stoğa eklendi');
         }
       }
 
-      storage.removeHistory(record.id);
+      await storage.removeHistory(record.id);
       loadHistory();
     } catch (error) {
       toast.error('İşlem geri alınırken hata oluştu');
@@ -543,7 +543,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
                 </div>
               </Card>
             </div>
-            
+
             <div>
               <Label>Kullanılan Malzemeler ({details.materials?.length || 0} adet)</Label>
               <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto">
@@ -568,11 +568,11 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     if (record.type === 'checklist') {
       const checkedCount = details.patients?.filter((p: any) => p.checked).length || 0;
       const totalCount = details.patients?.length || 0;
-      
+
       const formatHospitalName = (name: string) => {
         return name.replace(/eğitim\s+ve\s+araştırma\s+hastanesi/gi, 'EAH');
       };
-      
+
       return (
         <div>
           <div className="space-y-3">
@@ -587,7 +587,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
                 </div>
               </Card>
             </div>
-            
+
             <div>
               <Label>Hastalar</Label>
               <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto">

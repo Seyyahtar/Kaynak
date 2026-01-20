@@ -31,7 +31,7 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
 
     try {
       const patients = await importChecklistFromExcel(file);
-      
+
       if (patients.length === 0) {
         toast.error('Excel dosyasında hasta bulunamadı');
         return;
@@ -49,7 +49,7 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
       storage.saveChecklist(newChecklist);
       setActiveChecklist(newChecklist);
       toast.success(`${patients.length} hasta başarıyla yüklendi`);
-      
+
       // Input'u sıfırla
       setFileInputKey(prev => prev + 1);
     } catch (error) {
@@ -74,17 +74,17 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
     setActiveChecklist(updatedChecklist);
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!activeChecklist) return;
 
     // Tamamlanmayan hastaları kontrol et
     const uncheckedPatients = activeChecklist.patients.filter(p => !p.checked);
-    
+
     if (uncheckedPatients.length > 0) {
       const confirmed = window.confirm(
         `${uncheckedPatients.length} hastanın kontrolü yapılmadı. Yine de kaydetmek istiyor musunuz?`
       );
-      
+
       if (!confirmed) {
         return;
       }
@@ -99,7 +99,7 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
     storage.updateChecklist(completedChecklist);
 
     // Geçmişe kaydet
-    storage.addHistory({
+    await storage.addHistory({
       id: Date.now().toString(),
       date: completedChecklist.completedDate!,
       type: 'checklist',
@@ -173,7 +173,7 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
                   Excel dosyanızdan hasta listesini içe aktarın
                 </p>
               </div>
-              
+
               <div>
                 <Label
                   htmlFor="file-upload"
@@ -225,65 +225,63 @@ export default function ChecklistPage({ onNavigate }: ChecklistPageProps) {
                   patient.name.toLowerCase().includes(searchPatient.toLowerCase())
                 )
                 .map((patient, index) => (
-                <Card
-                  key={patient.id}
-                  className={`p-4 transition-colors ${
-                    patient.checked ? 'bg-green-50 border-green-200' : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id={patient.id}
-                      checked={patient.checked}
-                      onCheckedChange={() => handlePatientCheck(patient.id)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm text-slate-500">#{index + 1}</span>
-                        <Label
-                          htmlFor={patient.id}
-                          className={`cursor-pointer ${
-                            patient.checked ? 'line-through text-slate-500' : 'text-slate-800'
-                          }`}
-                        >
-                          {patient.name}
-                        </Label>
-                        {patient.checked && (
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 mt-2">
-                        {patient.hospital && (
-                          <div>
-                            <span className="text-slate-500">Hastane:</span> {formatHospitalName(patient.hospital)}
-                          </div>
-                        )}
-                        {patient.phone && (
-                          <div
-                            className="cursor-pointer hover:text-blue-600 transition-colors"
-                            onClick={() => copyToClipboard(formatPhoneNumber(patient.phone!))}
-                            title="Kopyalamak için tıklayın"
+                  <Card
+                    key={patient.id}
+                    className={`p-4 transition-colors ${patient.checked ? 'bg-green-50 border-green-200' : 'bg-white'
+                      }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id={patient.id}
+                        checked={patient.checked}
+                        onCheckedChange={() => handlePatientCheck(patient.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm text-slate-500">#{index + 1}</span>
+                          <Label
+                            htmlFor={patient.id}
+                            className={`cursor-pointer ${patient.checked ? 'line-through text-slate-500' : 'text-slate-800'
+                              }`}
                           >
-                            <span className="text-slate-500">Tel:</span> {formatPhoneNumber(patient.phone)}
-                          </div>
-                        )}
-                        {patient.time && (
-                          <div>
-                            <span className="text-slate-500">Saat:</span> {patient.time}
-                          </div>
-                        )}
-                        {patient.note && (
-                          <div className="col-span-2">
-                            <span className="text-slate-500">Not:</span> {patient.note}
-                          </div>
-                        )}
+                            {patient.name}
+                          </Label>
+                          {patient.checked && (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 mt-2">
+                          {patient.hospital && (
+                            <div>
+                              <span className="text-slate-500">Hastane:</span> {formatHospitalName(patient.hospital)}
+                            </div>
+                          )}
+                          {patient.phone && (
+                            <div
+                              className="cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => copyToClipboard(formatPhoneNumber(patient.phone!))}
+                              title="Kopyalamak için tıklayın"
+                            >
+                              <span className="text-slate-500">Tel:</span> {formatPhoneNumber(patient.phone)}
+                            </div>
+                          )}
+                          {patient.time && (
+                            <div>
+                              <span className="text-slate-500">Saat:</span> {patient.time}
+                            </div>
+                          )}
+                          {patient.note && (
+                            <div className="col-span-2">
+                              <span className="text-slate-500">Not:</span> {patient.note}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))}
             </div>
 
             {/* Tamamla Butonu */}

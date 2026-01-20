@@ -35,7 +35,11 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
   useEffect(() => {
-    setStockItems(storage.getStock());
+    const loadStock = async () => {
+      const data = await storage.getStock();
+      setStockItems(data);
+    };
+    loadStock();
   }, []);
 
   const addMaterialInput = () => {
@@ -58,14 +62,14 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
   const updateMaterial = (id: string, field: keyof MaterialInput, value: string) => {
     const updatedMaterials = materials.map((m) => {
       if (m.id !== id) return m;
-      
+
       const updated = { ...m, [field]: value };
-      
+
       if (field === 'serialLotNumber' && value.trim() !== '') {
-        const matchingItems = stockItems.filter(item => 
+        const matchingItems = stockItems.filter(item =>
           item.serialLotNumber.toLowerCase().includes(value.toLowerCase())
         );
-        
+
         if (matchingItems.length === 1) {
           const matchedItem = matchingItems[0];
           updated.materialName = matchedItem.materialName;
@@ -74,10 +78,10 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
           toast.success('Malzeme bilgileri otomatik dolduruldu');
         }
       }
-      
+
       return updated;
     });
-    
+
     setMaterials(updatedMaterials);
   };
 
@@ -110,13 +114,13 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
 
     const notInStock: string[] = [];
     const insufficientStock: string[] = [];
-    
+
     validMaterials.forEach((m) => {
       const stockItem = stockItems.find(
-        item => item.materialName.toLowerCase() === m.materialName.toLowerCase() && 
-                item.serialLotNumber.toLowerCase() === m.serialLotNumber.toLowerCase()
+        item => item.materialName.toLowerCase() === m.materialName.toLowerCase() &&
+          item.serialLotNumber.toLowerCase() === m.serialLotNumber.toLowerCase()
       );
-      
+
       if (!stockItem) {
         notInStock.push(`${m.materialName} (${m.serialLotNumber})`);
       } else if (stockItem.quantity < parseInt(m.quantity)) {
@@ -140,7 +144,7 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
       quantity: parseInt(m.quantity),
     }));
 
-    storage.removeStock(materialsToRemove);
+    await storage.removeStock(materialsToRemove);
 
     const caseRecord: CaseRecord = {
       id: Date.now().toString(),
@@ -157,9 +161,9 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
       })),
     };
 
-    storage.saveCase(caseRecord);
+    await storage.saveCase(caseRecord);
 
-    storage.addHistory({
+    await storage.addHistory({
       id: Date.now().toString(),
       date: formData.date,
       type: 'case',

@@ -50,7 +50,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<Partial<StockItem>>({});
-  const [sortStates, setSortStates] = useState<{[key: string]: {field: SortField | null, order: SortOrder}}>({});
+  const [sortStates, setSortStates] = useState<{ [key: string]: { field: SortField | null, order: SortOrder } }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [implantExportOpen, setImplantExportOpen] = useState(false);
   const [implantStartDate, setImplantStartDate] = useState(defaultStartStr);
@@ -81,8 +81,8 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
     loadDefaultTemplate();
   }, [implantTemplateData]);
 
-  const loadStock = () => {
-    const stockData = storage.getStock();
+  const loadStock = async () => {
+    const stockData = await storage.getStock();
     setStock(stockData);
   };
 
@@ -104,39 +104,39 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
     // Lead filtresi
     if (activeFilters.has('lead')) {
-      if (materialName.includes('solia') || 
-          materialName.includes('sentus') || 
-          materialName.includes('plexa')) {
+      if (materialName.includes('solia') ||
+        materialName.includes('sentus') ||
+        materialName.includes('plexa')) {
         return true;
       }
     }
 
     // Sheath filtresi
     if (activeFilters.has('sheath')) {
-      if (materialName.includes('safesheath') || 
-          materialName.includes('adelante') || 
-          materialName.includes('li-7') || 
-          materialName.includes('li-8')) {
+      if (materialName.includes('safesheath') ||
+        materialName.includes('adelante') ||
+        materialName.includes('li-7') ||
+        materialName.includes('li-8')) {
         return true;
       }
     }
 
     // Pacemaker filtresi
     if (activeFilters.has('pacemaker')) {
-      if (materialName.includes('amvia sky') || 
-          materialName.includes('endicos') || 
-          materialName.includes('enitra') || 
-          materialName.includes('edora')) {
+      if (materialName.includes('amvia sky') ||
+        materialName.includes('endicos') ||
+        materialName.includes('enitra') ||
+        materialName.includes('edora')) {
         return true;
       }
     }
 
     // ICD filtresi (VR-T veya DR-T içeren ama pacemaker olmayan)
     if (activeFilters.has('icd')) {
-      const isPacemaker = materialName.includes('amvia sky') || 
-                          materialName.includes('endicos') || 
-                          materialName.includes('enitra') || 
-                          materialName.includes('edora');
+      const isPacemaker = materialName.includes('amvia sky') ||
+        materialName.includes('endicos') ||
+        materialName.includes('enitra') ||
+        materialName.includes('edora');
       if (!isPacemaker && (materialName.includes('vr-t') || materialName.includes('dr-t'))) {
         return true;
       }
@@ -154,16 +154,16 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
   const filterStockBySearch = (item: StockItem): boolean => {
     if (!searchText.trim()) return true;
-    
+
     const search = searchText.toLowerCase();
     return item.materialName.toLowerCase().includes(search) ||
-           item.serialLotNumber.toLowerCase().includes(search) ||
-           item.ubbCode.toLowerCase().includes(search);
+      item.serialLotNumber.toLowerCase().includes(search) ||
+      item.ubbCode.toLowerCase().includes(search);
   };
 
   const handleExportToExcel = async () => {
     try {
-      const stockData = storage.getStock();
+      const stockData = await storage.getStock();
       if (stockData.length === 0) {
         toast.error('Dışa aktarılacak stok verisi yok');
         return;
@@ -201,7 +201,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       return;
     }
 
-    const cases = storage.getCases();
+    const cases = await storage.getCases();
     const filtered = cases.filter((c) => {
       const d = new Date(c.date);
       return !isNaN(d.getTime()) && d >= start && d <= end;
@@ -232,7 +232,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
     try {
       const importedItems = await importFromExcel(file);
-      
+
       if (importedItems.length === 0) {
         toast.error('Excel dosyasında geçerli veri bulunamadı');
         return;
@@ -241,14 +241,14 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       // Duplicate kontrolü yap
       const duplicates: string[] = [];
       const uniqueItems: StockItem[] = [];
-      
-      importedItems.forEach(item => {
-        if (storage.checkDuplicate(item.materialName, item.serialLotNumber)) {
+
+      for (const item of importedItems) {
+        if (await storage.checkDuplicate(item.materialName, item.serialLotNumber)) {
           duplicates.push(`${item.materialName} (${item.serialLotNumber})`);
         } else {
           uniqueItems.push(item);
         }
-      });
+      }
 
       if (duplicates.length > 0) {
         toast.error(`${duplicates.length} adet malzeme zaten stokta kayıtlı ve atlandı: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}`);
@@ -263,12 +263,12 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       }
 
       // Sadece unique item'ları storage'a ekle
-      uniqueItems.forEach(item => {
-        storage.addStock(item);
-      });
+      for (const item of uniqueItems) {
+        await storage.addStock(item);
+      }
 
       // Geçmişe kaydet
-      storage.addHistory({
+      await storage.addHistory({
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         type: 'stock-add',
@@ -279,7 +279,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       const totalQuantity = uniqueItems.reduce((sum, item) => sum + item.quantity, 0);
       toast.success(`${uniqueItems.length} kayıt (${totalQuantity} adet) başarıyla içe aktarıldı${duplicates.length > 0 ? ` (${duplicates.length} kayıt atlandı)` : ''}`);
       loadStock();
-      
+
       // Input'u temizle
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -308,7 +308,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
   const hierarchicalGroups: PrefixGroup[] = React.useMemo(() => {
     // Önce tam isme göre grupla
     const materialGroups: { [key: string]: MaterialGroup } = {};
-    
+
     filteredStockData.forEach(item => {
       if (!materialGroups[item.materialName]) {
         materialGroups[item.materialName] = {
@@ -323,11 +323,11 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
 
     // Sonra prefix'e göre grupla (ilk kelimeye göre)
     const prefixGroups: { [key: string]: PrefixGroup } = {};
-    
+
     Object.values(materialGroups).forEach(materialGroup => {
       // İlk kelimeyi prefix olarak al
       const prefix = materialGroup.fullName.split(' ')[0];
-      
+
       if (!prefixGroups[prefix]) {
         prefixGroups[prefix] = {
           prefix,
@@ -335,7 +335,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
           materials: [],
         };
       }
-      
+
       prefixGroups[prefix].totalQuantity += materialGroup.totalQuantity;
       prefixGroups[prefix].materials.push(materialGroup);
     });
@@ -345,7 +345,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       group.materials.sort((a, b) => a.fullName.localeCompare(b.fullName));
     });
 
-    return Object.values(prefixGroups).sort((a, b) => 
+    return Object.values(prefixGroups).sort((a, b) =>
       a.prefix.localeCompare(b.prefix)
     );
   }, [stock, activeFilters, searchText]);
@@ -370,10 +370,10 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
     setExpandedMaterials(newExpanded);
   };
 
-  const handleDeleteItem = (item: StockItem) => {
+  const handleDeleteItem = async (item: StockItem) => {
     if (window.confirm('Bu malzemeyi envanterden kaldırmak istediğinize emin misiniz?')) {
-      storage.deleteStockItem(item.id);
-      storage.addHistory({
+      await storage.deleteStockItem(item.id);
+      await storage.addHistory({
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         type: 'stock-delete',
@@ -399,7 +399,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
     });
   };
 
-  const handleSaveEdit = (item: StockItem) => {
+  const handleSaveEdit = async (item: StockItem) => {
     const updatedItem: StockItem = {
       ...item,
       serialLotNumber: editingValues.serialLotNumber || item.serialLotNumber,
@@ -408,15 +408,15 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
       quantity: editingValues.quantity || item.quantity,
     };
 
-    storage.updateStockItem(item.id, updatedItem);
-    storage.addHistory({
+    await storage.updateStockItem(item.id, updatedItem);
+    await storage.addHistory({
       id: Date.now().toString(),
       date: new Date().toISOString().split('T')[0],
       type: 'stock-remove',
       description: `${item.materialName} düzenlendi - ${currentUser}`,
       details: { old: item, new: updatedItem },
     });
-    
+
     toast.success('Malzeme başarıyla güncellendi');
     setEditingItemId(null);
     setEditingValues({});
@@ -427,7 +427,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
     setSortStates(prev => {
       const currentSort = prev[key];
       let newOrder: SortOrder = 'asc';
-      
+
       if (currentSort?.field === field) {
         if (currentSort.order === 'asc') {
           newOrder = 'desc';
@@ -435,7 +435,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
           newOrder = 'none';
         }
       }
-      
+
       return {
         ...prev,
         [key]: { field: newOrder === 'none' ? null : field, order: newOrder }
@@ -650,7 +650,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
               onChange={handleFileSelect}
               className="hidden"
             />
-            
+
             {/* Cihaz Adetleri - Menu Icinde */}
             <div className="pt-2 border-t">
               <div
@@ -699,8 +699,8 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
         {hierarchicalGroups.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-slate-500">
-              {(activeFilters.size > 0 || searchText) 
-                ? 'Filtreleme sonucu malzeme bulunamadı' 
+              {(activeFilters.size > 0 || searchText)
+                ? 'Filtreleme sonucu malzeme bulunamadı'
                 : 'Envanterde malzeme bulunmuyor'}
             </p>
           </Card>
@@ -708,7 +708,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
           <div className="space-y-2">
             {hierarchicalGroups.map((prefixGroup) => {
               const isPrefixExpanded = expandedPrefixes.has(prefixGroup.prefix);
-              
+
               return (
                 <Card key={prefixGroup.prefix} className="overflow-hidden">
                   {/* Seviye 1: Prefix Başlığı */}
@@ -747,7 +747,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
                         const isMaterialExpanded = expandedMaterials.has(material.fullName);
                         const sortKey = `${prefixGroup.prefix}-${material.fullName}`;
                         const sortedItems = getSortedItems(material.items, sortKey);
-                        
+
                         return (
                           <div key={material.fullName} className="border-b last:border-b-0">
                             <div
@@ -786,7 +786,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
                                     <tr>
                                       <th className="p-2 border-r text-slate-700">Seri/Lot</th>
                                       <th className="p-2 border-r text-slate-700">UBB Kodu</th>
-                                      <th 
+                                      <th
                                         className={`p-2 border-r ${getSortHeaderClass(sortKey, 'expiryDate')}`}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -795,7 +795,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
                                       >
                                         SKT
                                       </th>
-                                      <th 
+                                      <th
                                         className={`p-2 border-r ${getSortHeaderClass(sortKey, 'quantity')}`}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -810,7 +810,7 @@ export default function StockPage({ onNavigate, currentUser }: StockPageProps) {
                                   <tbody>
                                     {sortedItems.map((item) => {
                                       const isEditing = editingItemId === item.id;
-                                      
+
                                       return (
                                         <tr key={item.id} className="border-t">
                                           <td className="p-2 border-r text-slate-600">

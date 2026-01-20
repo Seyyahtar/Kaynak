@@ -26,19 +26,20 @@ export default function SettingsPage({
   const [storageInfo, setStorageInfo] =
     React.useState(getStorageInfo());
 
-  const handleClearStock = () => {
+  const handleClearStock = async () => {
     if (
       window.confirm(
         "Tüm stok kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
       )
     ) {
-      storage.saveStock([]);
+      await storage.saveStock([]);
       toast.success("Tüm stok kayıtları temizlendi");
-      setStorageInfo(getStorageInfo());
+      const info = await getStorageInfo();
+      setStorageInfo(info);
     }
   };
 
-  const handleClearHistory = () => {
+  const handleClearHistory = async () => {
     if (
       window.confirm(
         "Tüm geçmiş kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
@@ -49,7 +50,8 @@ export default function SettingsPage({
         JSON.stringify([]),
       );
       toast.success("Tüm geçmiş kayıtları temizlendi");
-      setStorageInfo(getStorageInfo());
+      const info = await getStorageInfo();
+      setStorageInfo(info);
     }
   };
 
@@ -77,10 +79,10 @@ export default function SettingsPage({
     }
   };
 
-  function getStorageInfo() {
-    const stock = storage.getStock();
-    const cases = storage.getCases();
-    const history = storage.getHistory();
+  async function getStorageInfo() {
+    const stock = await storage.getStock();
+    const cases = await storage.getCases();
+    const history = await storage.getHistory();
 
     return {
       stockCount: stock.length,
@@ -88,6 +90,14 @@ export default function SettingsPage({
       historyCount: history.length,
     };
   }
+
+  React.useEffect(() => {
+    const loadInfo = async () => {
+      const info = await getStorageInfo();
+      setStorageInfo(info);
+    };
+    loadInfo();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
