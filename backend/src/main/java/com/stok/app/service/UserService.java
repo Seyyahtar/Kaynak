@@ -23,13 +23,27 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        // Ensure ibrahim has correct password
+        userRepository.findByUsername("ibrahim").ifPresent(user -> {
+            user.setPasswordHash(passwordEncoder.encode("123"));
+            userRepository.save(user);
+            log.info("Password for user 'ibrahim' reset to '123'");
+        });
+    }
 
     public UserResponse login(LoginRequest request) {
         log.debug("User login attempt: {}", request.getUsername());
 
-        // Simple authentication (JWT will be added later)
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("Invalid password");
+        }
 
         // Update last login
         user.setLastLogin(LocalDateTime.now());
@@ -46,7 +60,7 @@ public class UserService {
         return mapToResponse(user);
     }
 
-    public UserResponse createUser(String username, String fullName, String email) {
+    public UserResponse createUser(String username, String fullName, String email, String password) {
         log.debug("Creating user: {}", username);
 
         if (userRepository.existsByUsername(username)) {
@@ -57,7 +71,7 @@ public class UserService {
         user.setUsername(username);
         user.setFullName(fullName);
         user.setEmail(email);
-        // Password will be set when JWT is implemented
+        user.setPasswordHash(passwordEncoder.encode(password));
 
         User saved = userRepository.save(user);
         log.info("User created: {}", saved.getUsername());

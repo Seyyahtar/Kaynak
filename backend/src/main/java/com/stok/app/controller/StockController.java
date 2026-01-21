@@ -74,6 +74,14 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success("Stock items removed successfully", null));
     }
 
+    @DeleteMapping("/all")
+    public ResponseEntity<ApiResponse<Void>> deleteAllStock(
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        stockService.deleteAllStock(effectiveUserId);
+        return ResponseEntity.ok(ApiResponse.success("All stock items deleted successfully", null));
+    }
+
     @GetMapping("/check-duplicate")
     public ResponseEntity<ApiResponse<Boolean>> checkDuplicate(
             @RequestParam String materialName,

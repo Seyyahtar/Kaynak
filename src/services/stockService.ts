@@ -12,5 +12,7 @@ export const stockService = {
 
     delete: (id: string) => api.delete(`/stocks/${id}`),
 
+    deleteAll: () => api.delete('/stocks/all'),
+
     bulkUpdate: (items: any[]) => api.post('/stocks/bulk', items),
 };

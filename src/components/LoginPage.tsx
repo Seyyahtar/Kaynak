@@ -14,23 +14,54 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim()) {
-      toast.error('Lütfen kullanıcı adı girin');
+    if (!username.trim() || !password.trim()) {
+      toast.error('Lütfen kullanıcı adı ve şifre girin');
       return;
     }
 
-    const user = {
-      username: username.trim(),
-      loginDate: new Date().toISOString(),
-    };
+    setLoading(true);
+    try {
+      // Authenticate with backend
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password.trim()
+        }),
+      });
 
-    storage.saveUser(user);
-    onLogin(username.trim());
-    toast.success(`Hoş geldiniz, ${username.trim()}!`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const user = {
+          username: data.data.username,
+          id: data.data.id,
+          fullName: data.data.fullName,
+          loginDate: new Date().toISOString(),
+        };
+
+        // Save to local storage
+        storage.saveUser(user);
+        onLogin(user.username);
+        toast.success(`Hoş geldiniz, ${user.fullName || user.username}!`);
+      } else {
+        toast.error(data.message || 'Giriş başarısız');
+      }
+    } catch (error) {
+      console.error('Login error', error);
+      toast.error('Sunucuya bağlanılamadı');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,13 +82,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Adınızı girin"
+              placeholder="Kullanıcı adınız"
               autoFocus
+              disabled={loading}
             />
           </div>
 
-          <Button type="submit" className="w-full">
-            Giriş Yap
+          <div>
+            <Label htmlFor="password">Şifre</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Şifreniz"
+              disabled={loading}
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
           </Button>
         </form>
       </Card>

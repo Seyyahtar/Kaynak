@@ -39,4 +39,12 @@ public class HistoryController {
         historyService.deleteHistory(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("History record deleted successfully", null));
     }
+
+    @DeleteMapping("/all")
+    public ResponseEntity<ApiResponse<Void>> deleteAllHistory(
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        historyService.deleteAllHistory(effectiveUserId);
+        return ResponseEntity.ok(ApiResponse.success("All history records deleted successfully", null));
+    }
 }

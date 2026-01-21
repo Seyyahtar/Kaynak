@@ -144,7 +144,8 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
       quantity: parseInt(m.quantity),
     }));
 
-    await storage.removeStock(materialsToRemove);
+    // Backend handles stock removal now
+    // await storage.removeStock(materialsToRemove);
 
     const caseRecord: CaseRecord = {
       id: Date.now().toString(),

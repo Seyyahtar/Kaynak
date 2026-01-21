@@ -175,6 +175,21 @@ public class StockService {
         log.info("Stock items removed for user: {}", userId);
     }
 
+    public void deleteAllStock(UUID userId) {
+        log.debug("Deleting all stock for user: {}", userId);
+
+        // Add history record
+        historyService.addHistory(
+                userId,
+                "stock-delete",
+                "Tüm stok kayıtları silindi",
+                new HashMap<>()); // Empty details
+
+        List<StockItem> userStock = stockItemRepository.findByUserId(userId);
+        stockItemRepository.deleteAll(userStock);
+        log.info("All stock items deleted for user: {}", userId);
+    }
+
     public boolean checkDuplicate(String materialName, String serialLotNumber, UUID userId) {
         return stockItemRepository.findByMaterialNameAndSerialLotNumberAndUserId(
                 materialName, serialLotNumber, userId).isPresent();

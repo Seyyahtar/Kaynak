@@ -76,6 +76,19 @@ public class CaseService {
             caseRecord.addMaterial(material);
         }
 
+        // Deduct from stock
+        List<com.stok.app.dto.request.RemoveStockRequest> removeRequests = request.getMaterials().stream()
+                .map(m -> {
+                    com.stok.app.dto.request.RemoveStockRequest req = new com.stok.app.dto.request.RemoveStockRequest();
+                    req.setMaterialName(m.getMaterialName());
+                    req.setSerialLotNumber(m.getSerialLotNumber());
+                    req.setQuantity(m.getQuantity());
+                    return req;
+                })
+                .collect(Collectors.toList());
+
+        stockService.removeStockItems(removeRequests, userId);
+
         CaseRecord saved = caseRecordRepository.save(caseRecord);
 
         // Add history record
@@ -113,5 +126,12 @@ public class CaseService {
                         .collect(Collectors.toList()))
                 .createdAt(caseRecord.getCreatedAt())
                 .build();
+    }
+
+    public void deleteAllCases(UUID userId) {
+        log.debug("Deleting all cases for user: {}", userId);
+        List<CaseRecord> userCases = caseRecordRepository.findByUserId(userId);
+        caseRecordRepository.deleteAll(userCases);
+        log.info("All cases deleted for user: {}", userId);
     }
 }

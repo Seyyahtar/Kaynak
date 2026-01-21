@@ -3,12 +3,8 @@ package com.stok.app.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
-/**
- * DTO for user login
- */
 @Data
 public class LoginRequest {
-
     @NotBlank(message = "Username is required")
     private String username;
 

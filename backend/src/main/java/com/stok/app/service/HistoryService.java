@@ -1,11 +1,13 @@
 package com.stok.app.service;
 
 import com.stok.app.entity.HistoryRecord;
+import com.stok.app.entity.CaseRecord;
 import com.stok.app.entity.User;
 import com.stok.app.dto.response.HistoryRecordResponse;
 import com.stok.app.exception.ResourceNotFoundException;
 import com.stok.app.repository.HistoryRecordRepository;
 import com.stok.app.repository.UserRepository;
+import com.stok.app.repository.CaseRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class HistoryService {
 
     private final HistoryRecordRepository historyRecordRepository;
     private final UserRepository userRepository;
+    private final CaseRecordRepository caseRecordRepository;
 
     public List<HistoryRecordResponse> getAllHistory(UUID userId) {
         log.debug("Getting all history for user: {}", userId);
@@ -65,6 +68,19 @@ public class HistoryService {
 
         historyRecordRepository.delete(record);
         log.info("History record deleted: {}", id);
+    }
+
+    public void deleteAllHistory(UUID userId) {
+        log.debug("Deleting all history for user: {}", userId);
+
+        // As requested, deleting history also deletes all associated case records
+        // Using repository directly to avoid circular dependency with CaseService
+        List<CaseRecord> userCases = caseRecordRepository.findByUserId(userId);
+        caseRecordRepository.deleteAll(userCases);
+
+        List<HistoryRecord> userHistory = historyRecordRepository.findByUserIdOrderByRecordDateDesc(userId);
+        historyRecordRepository.deleteAll(userHistory);
+        log.info("All history records (and cases) deleted for user: {}", userId);
     }
 
     private HistoryRecordResponse mapToResponse(HistoryRecord record) {

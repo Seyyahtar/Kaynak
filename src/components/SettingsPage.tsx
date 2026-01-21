@@ -5,12 +5,17 @@ import {
   Info,
   LogOut,
   User,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Page } from "../types";
 import { storage } from "../utils/storage";
 import { toast } from "sonner@2.0.3";
+import { stockService } from "../services/stockService";
+import { historyService } from "../services/historyService";
 
 interface SettingsPageProps {
   onNavigate: (page: Page) => void;
@@ -23,59 +28,21 @@ export default function SettingsPage({
   currentUser,
   onLogout,
 }: SettingsPageProps) {
-  const [storageInfo, setStorageInfo] =
-    React.useState(getStorageInfo());
+  const [storageInfo, setStorageInfo] = React.useState({
+    stockCount: 0,
+    casesCount: 0,
+    historyCount: 0,
+  });
+  const [dbStatus, setDbStatus] = React.useState<'connected' | 'disconnected' | 'checking'>('checking');
 
-  const handleClearStock = async () => {
-    if (
-      window.confirm(
-        "Tüm stok kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
-      )
-    ) {
-      await storage.saveStock([]);
-      toast.success("Tüm stok kayıtları temizlendi");
-      const info = await getStorageInfo();
-      setStorageInfo(info);
-    }
-  };
-
-  const handleClearHistory = async () => {
-    if (
-      window.confirm(
-        "Tüm geçmiş kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
-      )
-    ) {
-      localStorage.setItem(
-        "medical_inventory_history",
-        JSON.stringify([]),
-      );
-      toast.success("Tüm geçmiş kayıtları temizlendi");
-      const info = await getStorageInfo();
-      setStorageInfo(info);
-    }
-  };
-
-  const handleClearData = () => {
-    if (
-      window.confirm(
-        "Tüm verileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
-      )
-    ) {
-      localStorage.clear();
-      toast.success("Tüm veriler temizlendi");
-      onLogout();
-    }
-  };
-
-  const handleLogout = () => {
-    if (
-      window.confirm(
-        "Çıkış yapmak istediğinizden emin misiniz?",
-      )
-    ) {
-      storage.clearUser();
-      toast.success("Başarıyla çıkış yapıldı");
-      onLogout();
+  const checkConnection = async () => {
+    setDbStatus('checking');
+    try {
+      await stockService.getAll();
+      setDbStatus('connected');
+    } catch (error) {
+      console.error("Bağlantı kontrolü başarısız", error);
+      setDbStatus('disconnected');
     }
   };
 
@@ -91,12 +58,81 @@ export default function SettingsPage({
     };
   }
 
+  const handleClearStock = async () => {
+    if (
+      window.confirm(
+        "Tüm stok kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      )
+    ) {
+      await stockService.deleteAll();
+      await storage.saveStock([]); // Clear local storage as well
+      toast.success("Tüm stok kayıtları temizlendi");
+      const info = await getStorageInfo();
+      setStorageInfo(info);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (
+      window.confirm(
+        "Tüm geçmiş kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      )
+    ) {
+      await historyService.deleteAll();
+      localStorage.setItem("medical_inventory_history", JSON.stringify([])); // Clear local storage as well for safety
+      toast.success("Tüm geçmiş kayıtları temizlendi");
+      const info = await getStorageInfo();
+      setStorageInfo(info);
+    }
+  };
+
+  const handleClearData = async () => {
+    if (
+      window.confirm(
+        "Tüm verileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      )
+    ) {
+      try {
+        // Clear everything from Backend Database
+        await stockService.deleteAll();
+        await historyService.deleteAll(); // This also clears cases in our new backend implementation
+
+        // Clear local storage
+        localStorage.clear();
+        storage.clearUser();
+
+        toast.success("Tüm veriler veritabanından ve yerel depolamadan başarıyla silindi");
+        onLogout();
+      } catch (error) {
+        console.error("Veri temizleme hatası", error);
+        toast.error("Bazı veriler silinemedi. Lütfen bağlantıyı kontrol edin.");
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    if (
+      window.confirm(
+        "Çıkış yapmak istediğinizden emin misiniz?",
+      )
+    ) {
+      storage.clearUser();
+      toast.success("Başarıyla çıkış yapıldı");
+      onLogout();
+    }
+  };
+
   React.useEffect(() => {
     const loadInfo = async () => {
       const info = await getStorageInfo();
       setStorageInfo(info);
     };
     loadInfo();
+
+    // Check DB connection
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -138,6 +174,39 @@ export default function SettingsPage({
             <LogOut className="w-4 h-4 mr-2" />
             Çıkış Yap
           </Button>
+        </Card>
+
+        {/* Veritabanı Durumu - NEW */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {dbStatus === 'checking' && <RefreshCw className="w-5 h-5 text-gray-500 animate-spin" />}
+              {dbStatus === 'connected' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+              {dbStatus === 'disconnected' && <XCircle className="w-5 h-5 text-red-500" />}
+
+              <div>
+                <h2 className="text-slate-800 font-medium">Veritabanı Durumu</h2>
+                <p className={`text-sm ${dbStatus === 'connected' ? 'text-green-600' :
+                  dbStatus === 'disconnected' ? 'text-red-600' : 'text-gray-500'
+                  }`}>
+                  {dbStatus === 'connected' ? 'Bağlantı Başarılı' :
+                    dbStatus === 'disconnected' ? 'Bağlantı Hatası' : 'Kontrol Ediliyor...'}
+                </p>
+              </div>
+            </div>
+
+            {dbStatus === 'disconnected' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={checkConnection}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Tekrar Dene
+              </Button>
+            )}
+          </div>
         </Card>
 
         {/* Uygulama Bilgisi */}

@@ -53,4 +53,12 @@ public class CaseController {
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Case record created successfully", caseRecord));
     }
+
+    @DeleteMapping("/all")
+    public ResponseEntity<ApiResponse<Void>> deleteAllCases(
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        caseService.deleteAllCases(effectiveUserId);
+        return ResponseEntity.ok(ApiResponse.success("All case records deleted successfully", null));
+    }
 }
