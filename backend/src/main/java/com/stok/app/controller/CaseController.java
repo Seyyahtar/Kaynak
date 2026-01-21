@@ -24,27 +24,31 @@ import java.util.UUID;
 public class CaseController {
 
     private final CaseService caseService;
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<CaseRecordResponse>>> getAllCases(
-            @RequestParam UUID userId) {
-        List<CaseRecordResponse> cases = caseService.getAllCases(userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        List<CaseRecordResponse> cases = caseService.getAllCases(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(cases));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CaseRecordResponse>> getCaseById(
             @PathVariable UUID id,
-            @RequestParam UUID userId) {
-        CaseRecordResponse caseRecord = caseService.getCaseById(id, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        CaseRecordResponse caseRecord = caseService.getCaseById(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(caseRecord));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<CaseRecordResponse>> createCase(
             @Valid @RequestBody CaseRecordRequest request,
-            @RequestParam UUID userId) {
-        CaseRecordResponse caseRecord = caseService.createCase(request, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        CaseRecordResponse caseRecord = caseService.createCase(request, effectiveUserId);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Case record created successfully", caseRecord));

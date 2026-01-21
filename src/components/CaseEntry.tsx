@@ -85,7 +85,7 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
     setMaterials(updatedMaterials);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.hospitalName || !formData.doctorName || !formData.patientName) {

@@ -19,25 +19,28 @@ import java.util.UUID;
  * Handles all stock-related endpoints
  */
 @RestController
-@RequestMapping("/stock")
+@RequestMapping("/stocks")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class StockController {
 
     private final StockService stockService;
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<StockItemResponse>>> getAllStock(
-            @RequestParam UUID userId) {
-        List<StockItemResponse> stock = stockService.getAllStock(userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        List<StockItemResponse> stock = stockService.getAllStock(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(stock));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<StockItemResponse>> addStock(
             @Valid @RequestBody StockItemRequest request,
-            @RequestParam UUID userId) {
-        StockItemResponse stockItem = stockService.addStockItem(request, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        StockItemResponse stockItem = stockService.addStockItem(request, effectiveUserId);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Stock item added successfully", stockItem));
@@ -47,24 +50,27 @@ public class StockController {
     public ResponseEntity<ApiResponse<StockItemResponse>> updateStock(
             @PathVariable UUID id,
             @Valid @RequestBody StockItemRequest request,
-            @RequestParam UUID userId) {
-        StockItemResponse stockItem = stockService.updateStockItem(id, userId, request);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        StockItemResponse stockItem = stockService.updateStockItem(id, effectiveUserId, request);
         return ResponseEntity.ok(ApiResponse.success("Stock item updated successfully", stockItem));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteStock(
             @PathVariable UUID id,
-            @RequestParam UUID userId) {
-        stockService.deleteStockItem(id, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        stockService.deleteStockItem(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("Stock item deleted successfully", null));
     }
 
     @PostMapping("/remove")
     public ResponseEntity<ApiResponse<Void>> removeStockItems(
             @Valid @RequestBody List<RemoveStockRequest> requests,
-            @RequestParam UUID userId) {
-        stockService.removeStockItems(requests, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        stockService.removeStockItems(requests, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("Stock items removed successfully", null));
     }
 
@@ -72,8 +78,9 @@ public class StockController {
     public ResponseEntity<ApiResponse<Boolean>> checkDuplicate(
             @RequestParam String materialName,
             @RequestParam String serialLotNumber,
-            @RequestParam UUID userId) {
-        boolean exists = stockService.checkDuplicate(materialName, serialLotNumber, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        boolean exists = stockService.checkDuplicate(materialName, serialLotNumber, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(exists));
     }
 }

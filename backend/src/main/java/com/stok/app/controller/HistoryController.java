@@ -21,19 +21,22 @@ import java.util.UUID;
 public class HistoryController {
 
     private final HistoryService historyService;
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<HistoryRecordResponse>>> getAllHistory(
-            @RequestParam UUID userId) {
-        List<HistoryRecordResponse> history = historyService.getAllHistory(userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        List<HistoryRecordResponse> history = historyService.getAllHistory(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(history));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteHistory(
             @PathVariable UUID id,
-            @RequestParam UUID userId) {
-        historyService.deleteHistory(id, userId);
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        historyService.deleteHistory(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("History record deleted successfully", null));
     }
 }

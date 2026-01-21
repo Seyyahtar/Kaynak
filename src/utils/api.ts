@@ -21,7 +21,16 @@ export const api = {
             return {} as T;
         }
 
-        return response.json();
+        const apiResponse = await response.json();
+
+        // Backend returns wrapped response: { success: boolean, message: string, data: T }
+        if (apiResponse.success === false) {
+            throw new Error(apiResponse.message || 'Unknown API Error');
+        }
+
+        // Return the data part if it exists, otherwise return the whole response
+        // This handles cases where backend might sometimes return direct data
+        return (apiResponse.data !== undefined ? apiResponse.data : apiResponse) as T;
     },
 
     get<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
