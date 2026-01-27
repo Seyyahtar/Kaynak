@@ -55,11 +55,33 @@ export interface HistoryRecord {
   type: 'stock-add' | 'stock-remove' | 'case' | 'stock-delete' | 'checklist';
   description: string;
   details: any;
+  userId?: string;
 }
+
+export type UserRole = 'ADMIN' | 'YONETICI' | 'DEPO' | 'KULLANICI';
 
 export interface User {
+  id: string;
   username: string;
-  loginDate: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  region?: string;
+  role: UserRole;
+  active: boolean;
+  lastLogin?: string;
+  createdAt: string;
+  loginDate?: string; // For backwards compatibility
 }
 
-export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist';
+export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection';
+
+export interface TransferItemRequest {
+  stockItemId: string;
+  quantity: number;
+}
+
+export interface TransferRequest {
+  receiverId: string;
+  items: TransferItemRequest[];
+}

@@ -8,8 +8,8 @@ import com.stok.app.entity.User;
 import com.stok.app.exception.ResourceNotFoundException;
 import com.stok.app.repository.StockItemRepository;
 import com.stok.app.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +25,30 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-@RequiredArgsConstructor
-@Slf4j
 public class StockService {
+
+    private static final Logger log = LoggerFactory.getLogger(StockService.class);
 
     private final StockItemRepository stockItemRepository;
     private final UserRepository userRepository;
     private final HistoryService historyService;
+    private final AuditLogService auditLogService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final NotificationService notificationService;
+
+    public StockService(StockItemRepository stockItemRepository,
+            UserRepository userRepository,
+            HistoryService historyService,
+            AuditLogService auditLogService,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            NotificationService notificationService) {
+        this.stockItemRepository = stockItemRepository;
+        this.userRepository = userRepository;
+        this.historyService = historyService;
+        this.auditLogService = auditLogService;
+        this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
+    }
 
     public List<StockItemResponse> getAllStock(UUID userId) {
         log.debug("Getting all stock for user: {}", userId);
@@ -41,6 +58,10 @@ public class StockService {
     }
 
     public StockItemResponse addStockItem(StockItemRequest request, UUID userId) {
+        return addStockItem(request, userId, true);
+    }
+
+    private StockItemResponse addStockItem(StockItemRequest request, UUID userId, boolean addHistory) {
         log.debug("Adding stock item: {} for user: {}", request.getMaterialName(), userId);
 
         User user = userRepository.findById(userId)
@@ -53,7 +74,8 @@ public class StockService {
                 userId).isPresent();
 
         if (exists) {
-            throw new IllegalArgumentException("Stock item with same material name and serial number already exists");
+            throw new IllegalArgumentException("Stock item with same material name and serial number already exists: "
+                    + request.getMaterialName());
         }
 
         StockItem stockItem = new StockItem();
@@ -70,19 +92,47 @@ public class StockService {
 
         StockItem saved = stockItemRepository.save(stockItem);
 
-        // Add history record
-        Map<String, Object> details = new HashMap<>();
-        details.put("materialName", saved.getMaterialName());
-        details.put("serialLotNumber", saved.getSerialLotNumber());
-        details.put("quantity", saved.getQuantity());
-        historyService.addHistory(
-                userId,
-                "stock-add",
-                "Stok eklendi: " + saved.getMaterialName() + " (" + saved.getQuantity() + " adet)",
-                details);
+        if (addHistory) {
+            // Add history record
+            Map<String, Object> details = new HashMap<>();
+            details.put("materialName", saved.getMaterialName());
+            details.put("serialLotNumber", saved.getSerialLotNumber());
+            details.put("quantity", saved.getQuantity());
+            historyService.addHistory(
+                    userId,
+                    "stock-add",
+                    "Stok eklendi: " + saved.getMaterialName() + " (" + saved.getQuantity() + " adet)",
+                    details);
+        }
+
+        auditLogService.log("CREATE_STOCK", "StockItem", saved.getId().toString(),
+                "Added material: " + saved.getMaterialName());
 
         log.info("Stock item added: {}", saved.getId());
         return mapToResponse(saved);
+    }
+
+    public List<StockItemResponse> addStockItems(List<StockItemRequest> requests, UUID userId) {
+        log.info("Bulk adding {} stock items for user: {}", requests.size(), userId);
+
+        List<StockItemResponse> results = requests.stream()
+                .map(req -> addStockItem(req, userId, false))
+                .collect(Collectors.toList());
+
+        // Add ONE single history record for the whole batch
+        int totalQuantity = requests.stream().mapToInt(StockItemRequest::getQuantity).sum();
+        Map<String, Object> details = new HashMap<>();
+        details.put("count", requests.size());
+        details.put("totalQuantity", totalQuantity);
+        details.put("items", results);
+
+        historyService.addHistory(
+                userId,
+                "stock-add",
+                String.format("Toplu stok girişi: %d kalem (%d adet) malzeme eklendi", requests.size(), totalQuantity),
+                details);
+
+        return results;
     }
 
     public StockItemResponse updateStockItem(UUID id, UUID userId, StockItemRequest request) {
@@ -106,6 +156,10 @@ public class StockService {
         stockItem.setMaterialCode(request.getMaterialCode());
 
         StockItem updated = stockItemRepository.save(stockItem);
+
+        auditLogService.log("UPDATE_STOCK", "StockItem", id.toString(),
+                "Updated quantity/details for: " + updated.getMaterialName());
+
         log.info("Stock item updated: {}", id);
         return mapToResponse(updated);
     }
@@ -132,6 +186,10 @@ public class StockService {
                 details);
 
         stockItemRepository.delete(stockItem);
+
+        auditLogService.log("DELETE_STOCK", "StockItem", id.toString(),
+                "Deleted material: " + stockItem.getMaterialName());
+
         log.info("Stock item deleted: {}", id);
     }
 
@@ -183,7 +241,7 @@ public class StockService {
                 userId,
                 "stock-delete",
                 "Tüm stok kayıtları silindi",
-                new HashMap<>()); // Empty details
+                new HashMap<String, Object>());
 
         List<StockItem> userStock = stockItemRepository.findByUserId(userId);
         stockItemRepository.deleteAll(userStock);
@@ -193,6 +251,226 @@ public class StockService {
     public boolean checkDuplicate(String materialName, String serialLotNumber, UUID userId) {
         return stockItemRepository.findByMaterialNameAndSerialLotNumberAndUserId(
                 materialName, serialLotNumber, userId).isPresent();
+    }
+
+    public void initiateTransfer(UUID senderId, UUID receiverId,
+            List<com.stok.app.dto.request.TransferItemRequest> items) {
+        log.info("Initiating transfer from {} to {}", senderId, receiverId);
+
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
+
+        // Validate items and check stock
+        for (com.stok.app.dto.request.TransferItemRequest itemReq : items) {
+            StockItem stockItem = stockItemRepository.findById(itemReq.getStockItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Stock item not found"));
+
+            if (!stockItem.getUser().getId().equals(senderId)) {
+                throw new IllegalArgumentException("Unauthorized transfer");
+            }
+
+            if (stockItem.getQuantity() < itemReq.getQuantity()) {
+                throw new IllegalArgumentException("Insufficient quantity for item: " + stockItem.getMaterialName());
+            }
+        }
+
+        // Process deduction and prepare content
+        List<Map<String, Object>> transferredItems = new java.util.ArrayList<>();
+
+        for (com.stok.app.dto.request.TransferItemRequest itemReq : items) {
+            StockItem stockItem = stockItemRepository.findById(itemReq.getStockItemId()).get();
+
+            // Deduct from sender
+            stockItem.setQuantity(stockItem.getQuantity() - itemReq.getQuantity());
+            if (stockItem.getQuantity() == 0) {
+                stockItemRepository.delete(stockItem);
+            } else {
+                stockItemRepository.save(stockItem);
+            }
+
+            Map<String, Object> itemData = new HashMap<>();
+            itemData.put("materialName", stockItem.getMaterialName());
+            itemData.put("serialLotNumber", stockItem.getSerialLotNumber());
+            itemData.put("ubbCode", stockItem.getUbbCode());
+            itemData.put("expiryDate", stockItem.getExpiryDate());
+            itemData.put("quantity", itemReq.getQuantity());
+            itemData.put("fromField", stockItem.getFromField());
+            itemData.put("toField", stockItem.getToField());
+            itemData.put("materialCode", stockItem.getMaterialCode());
+            itemData.put("dateAdded", stockItem.getDateAdded());
+
+            transferredItems.add(itemData);
+        }
+
+        // Create Notification content
+        String contentJson;
+        try {
+            contentJson = objectMapper.writeValueAsString(transferredItems);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Error serializing transfer items", e);
+        }
+
+        // Send Notification
+        String title = sender.getFullName() + " size stok transfer isteği gönderdi";
+        notificationService.createNotification(
+                senderId,
+                receiverId,
+                com.stok.app.entity.NotificationType.TRANSFER_REQUEST,
+                title,
+                contentJson,
+                com.stok.app.entity.NotificationActionStatus.WAITING);
+
+        historyService.addHistory(
+                senderId,
+                "stock-remove",
+                "Stok transferi başlatıldı -> " + receiver.getFullName() + " (" + items.size() + " kalem)",
+                new HashMap<String, Object>() {
+                    {
+                        put("receiver", receiver.getUsername());
+                        put("items", transferredItems);
+                    }
+                });
+
+        auditLogService.log("TRANSFER_INITIATED", "Transfer", null,
+                "Transfer initiated from sender: " + senderId + " to receiver: " + receiverId);
+    }
+
+    public void processTransfer(UUID notificationId, com.stok.app.entity.NotificationActionStatus action) {
+        log.info("Processing transfer notification: {} with action: {}", notificationId, action);
+
+        com.stok.app.entity.Notification notification = notificationService.getNotification(notificationId);
+
+        if (notification.getType() != com.stok.app.entity.NotificationType.TRANSFER_REQUEST) {
+            throw new IllegalArgumentException("Invalid notification type for transfer processing");
+        }
+
+        if (notification.getActionStatus() != com.stok.app.entity.NotificationActionStatus.WAITING) {
+            throw new IllegalArgumentException("Transfer already processed");
+        }
+
+        List<Map<String, Object>> items;
+        try {
+            items = objectMapper.readValue(notification.getContent(),
+                    new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                    });
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Error deserializing transfer items", e);
+        }
+
+        User sender = userRepository.findById(notification.getSenderId()).orElse(null);
+        User receiver = userRepository.findById(notification.getReceiverId()).orElseThrow();
+
+        if (action == com.stok.app.entity.NotificationActionStatus.APPROVED) {
+            // Add items to receiver
+            for (Map<String, Object> itemData : items) {
+                StockItemRequest req = mapToRequest(itemData);
+                addStockItem(req, receiver.getId(), false);
+            }
+
+            // Update Notification
+            notificationService.updateActionStatus(notificationId,
+                    com.stok.app.entity.NotificationActionStatus.APPROVED);
+
+            // Notify Sender
+            if (sender != null) {
+                notificationService.createNotification(
+                        receiver.getId(),
+                        sender.getId(),
+                        com.stok.app.entity.NotificationType.TRANSFER_RESULT,
+                        receiver.getFullName() + " transferi onayladı",
+                        "Transfer işleminiz başarıyla tamamlandı.",
+                        com.stok.app.entity.NotificationActionStatus.APPROVED);
+            }
+
+            historyService.addHistory(
+                    receiver.getId(),
+                    "stock-add",
+                    sender != null ? sender.getFullName() + "'den transfer alındı" : "Bilinmeyen göndericiden transfer",
+                    new HashMap<String, Object>() {
+                        {
+                            put("count", items.size());
+                        }
+                    });
+
+        } else if (action == com.stok.app.entity.NotificationActionStatus.REJECTED) {
+            // Return items to sender
+            if (sender != null) {
+                for (Map<String, Object> itemData : items) {
+                    StockItemRequest tempReq = mapToRequest(itemData);
+                    addStockItem(tempReq, sender.getId(), false);
+                }
+
+                // Notify Sender
+                notificationService.createNotification(
+                        receiver.getId(),
+                        sender.getId(),
+                        com.stok.app.entity.NotificationType.TRANSFER_RESULT,
+                        receiver.getFullName() + " transferi reddetti",
+                        "Malzemeler stoğunuza iade edildi.",
+                        com.stok.app.entity.NotificationActionStatus.REJECTED);
+
+                historyService.addHistory(
+                        sender.getId(),
+                        "stock-add",
+                        "Transfer reddedildi, stok iade alındı",
+                        new HashMap<String, Object>() {
+                            {
+                                put("receiver", receiver.getUsername());
+                            }
+                        });
+            }
+
+            // Update Notification
+            notificationService.updateActionStatus(notificationId,
+                    com.stok.app.entity.NotificationActionStatus.REJECTED);
+        }
+    }
+
+    private StockItemRequest mapToRequest(Map<String, Object> data) {
+        StockItemRequest req = new StockItemRequest();
+        req.setMaterialName((String) data.get("materialName"));
+        req.setSerialLotNumber((String) data.get("serialLotNumber"));
+        req.setUbbCode((String) data.get("ubbCode"));
+        req.setQuantity((Integer) data.get("quantity"));
+        req.setFromField((String) data.get("fromField"));
+        req.setToField((String) data.get("toField"));
+        req.setMaterialCode((String) data.get("materialCode"));
+
+        req.setExpiryDate(parseDate(data.get("expiryDate")));
+        req.setDateAdded(parseDate(data.get("dateAdded")));
+
+        if (req.getDateAdded() == null) {
+            req.setDateAdded(java.time.LocalDate.now());
+        }
+
+        return req;
+    }
+
+    private java.time.LocalDate parseDate(Object dateObj) {
+        if (dateObj == null)
+            return null;
+
+        if (dateObj instanceof String) {
+            return java.time.LocalDate.parse((String) dateObj);
+        }
+
+        if (dateObj instanceof List) {
+            List<?> list = (List<?>) dateObj;
+            if (list.size() >= 3) {
+                return java.time.LocalDate.of(
+                        ((Number) list.get(0)).intValue(),
+                        ((Number) list.get(1)).intValue(),
+                        ((Number) list.get(2)).intValue());
+            }
+        }
+
+        try {
+            return java.time.LocalDate.parse(dateObj.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private StockItemResponse mapToResponse(StockItem item) {

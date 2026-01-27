@@ -92,8 +92,8 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
 
             const ubbIndex = header.indexOf("ubb kodu");
             ubbCode = ubbIndex >= 0
-             ? row[ubbIndex]?.toString().trim() || ""
-             : "";
+              ? row[ubbIndex]?.toString().trim() || ""
+              : "";
 
             serialLotNumber = row[findIndex("seri/lot no", 4)]?.toString().trim() || "";
             const expiryDateRaw = row[findIndex("s.k.t", 5)];
@@ -108,7 +108,7 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
             const ubbIndex = header.indexOf("ubb kodu");
             ubbCode = ubbIndex >= 0
               ? row[ubbIndex]?.toString().trim() || ""
-             : "";
+              : "";
 
             const descriptionCell = row[findIndex("açıklama", 4)]?.toString().trim() || "";
             quantity = parseQuantity(row[findIndex("miktar", 5)]);
@@ -342,10 +342,10 @@ export const exportImplantList = async (
     /* 🌐 WEB: Direkt indir */
     if (Capacitor.getPlatform() === "web") {
       XLSX.writeFile(workbook, filename);
-      return { 
-        success: true, 
-        message: "Dosya başarıyla indirildi", 
-        uri: null 
+      return {
+        success: true,
+        message: "Dosya başarıyla indirildi",
+        uri: null
       };
     }
 
@@ -388,10 +388,10 @@ export const exportImplantList = async (
     }
   } catch (error) {
     console.error("İmplant listesi export hatası:", error);
-    return { 
-      success: false, 
-      message: (error as Error).message || "Bilinmeyen bir hata oluştu", 
-      uri: null 
+    return {
+      success: false,
+      message: (error as Error).message || "Bilinmeyen bir hata oluştu",
+      uri: null
     };
   }
 };
@@ -492,6 +492,37 @@ export const importChecklistFromExcel = (file: File): Promise<ChecklistPatient[]
           return timeStr.replace(/:\d{2}$/, "");
         };
 
+        // Excel tarih formatından normal tarihe çevir (1900-01-01 = 1)
+        const normalizeExcelDate = (excelDate: any) => {
+          if (!excelDate) return "";
+
+          // Eğer zaten YYYY-MM-DD formatındaysa dokunma
+          if (typeof excelDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(excelDate)) {
+            return excelDate;
+          }
+
+          // Eğer DD.MM.YYYY formatındaysa çevir
+          if (typeof excelDate === 'string' && /^\d{2}\.\d{2}\.\d{4}$/.test(excelDate)) {
+            const parts = excelDate.split('.');
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+
+          const num = parseInt(excelDate.toString(), 10);
+          if (isNaN(num) || num < 1) {
+            // Belki bir Date objesidir veya başka bir string
+            try {
+              const d = new Date(excelDate);
+              if (!isNaN(d.getTime())) {
+                return d.toISOString().split("T")[0];
+              }
+            } catch (e) { }
+            return excelDate.toString();
+          }
+
+          const date = new Date((num - 1) * 24 * 60 * 60 * 1000 + new Date(1900, 0, 1).getTime());
+          return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+        };
+
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
           if (!row || row.length === 0 || !row[0]) continue;
@@ -501,7 +532,7 @@ export const importChecklistFromExcel = (file: File): Promise<ChecklistPatient[]
           const phone = row[2]?.toString().trim() || "";
           const city = row[3]?.toString().trim() || "";
           const hospital = row[4]?.toString().trim() || "";
-          const date = row[5]?.toString().trim() || "";
+          const date = normalizeExcelDate(row[5]);
           const time = formatExcelTime(row[6]);
 
           if (!name) continue;
@@ -540,14 +571,14 @@ export const exportHistoryToExcel = async (
 ) => {
   try {
     const excelData = historyRecords.map((record, index) => ({
-      "Sıra No" : index + 1,
-      "Tarih" : new Date(record.date).toLocaleDateString('tr-TR'),
-      "Tür" : record.type === 'stock-add' ? 'Stok Ekleme' :
-             record.type === 'stock-remove' ? 'Stok Çıkarma' :
-             record.type === 'stock-delete' ? 'Stok Silme' :
-             record.type === 'case' ? 'Vaka' :
-             record.type === 'checklist' ? 'Kontrol Listesi' : record.type,
-      "Açıklama" : record.description,
+      "Sıra No": index + 1,
+      "Tarih": new Date(record.date).toLocaleDateString('tr-TR'),
+      "Tür": record.type === 'stock-add' ? 'Stok Ekleme' :
+        record.type === 'stock-remove' ? 'Stok Çıkarma' :
+          record.type === 'stock-delete' ? 'Stok Silme' :
+            record.type === 'case' ? 'Vaka' :
+              record.type === 'checklist' ? 'Kontrol Listesi' : record.type,
+      "Açıklama": record.description,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -627,10 +658,10 @@ export const shareHistoryToExcel = async (
         "Sıra No": index + 1,
         "Tarih": new Date(record.date).toLocaleDateString("tr-TR"),
         "Tür": record.type === "stock-add" ? "Stok Ekleme" :
-               record.type === "stock-remove" ? "Stok Çıkarma" :
-               record.type === "stock-delete" ? "Stok Silme" :
-               record.type === "case" ? "Vaka" :
-               record.type === "checklist" ? "Kontrol Listesi" : record.type,
+          record.type === "stock-remove" ? "Stok Çıkarma" :
+            record.type === "stock-delete" ? "Stok Silme" :
+              record.type === "case" ? "Vaka" :
+                record.type === "checklist" ? "Kontrol Listesi" : record.type,
         "Açıklama": record.description,
         "Detaylar": details,
       };
@@ -645,7 +676,7 @@ export const shareHistoryToExcel = async (
       { wch: 100 }, // Detaylar
     ];
 
-        const workbook = XLSX.utils.book_new();
+    const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Geçmiş Kayıtları");
 
     const base64 = XLSX.write(workbook, {

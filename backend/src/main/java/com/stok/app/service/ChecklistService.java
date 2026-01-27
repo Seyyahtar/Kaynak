@@ -26,139 +26,196 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 @RequiredArgsConstructor
-@Slf4j
 public class ChecklistService {
 
-    private final ChecklistRecordRepository checklistRecordRepository;
-    private final UserRepository userRepository;
-    private final HistoryService historyService;
+        private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ChecklistService.class);
 
-    public List<ChecklistResponse> getAllChecklists(UUID userId) {
-        log.debug("Getting all checklists for user: {}", userId);
-        return checklistRecordRepository.findByUserIdOrderByCreatedDateDesc(userId).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
+        private final ChecklistRecordRepository checklistRecordRepository;
+        private final UserRepository userRepository;
+        private final HistoryService historyService;
 
-    public ChecklistResponse getActiveChecklist(UUID userId) {
-        log.debug("Getting active checklist for user: {}", userId);
-        return checklistRecordRepository.findByIsCompletedFalseAndUserId(userId)
-                .map(this::mapToResponse)
-                .orElse(null);
-    }
-
-    public ChecklistResponse createChecklist(ChecklistRequest request, UUID userId) {
-        log.debug("Creating checklist for user: {}", userId);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        ChecklistRecord checklist = new ChecklistRecord();
-        checklist.setTitle(request.getTitle());
-        checklist.setCreatedDate(LocalDateTime.now());
-        checklist.setIsCompleted(false);
-        checklist.setUser(user);
-
-        // Add patients
-        for (ChecklistRequest.PatientRequest patReq : request.getPatients()) {
-            ChecklistPatient patient = new ChecklistPatient();
-            patient.setName(patReq.getName());
-            patient.setNote(patReq.getNote());
-            patient.setPhone(patReq.getPhone());
-            patient.setCity(patReq.getCity());
-            patient.setHospital(patReq.getHospital());
-            patient.setAppointmentDate(patReq.getAppointmentDate());
-            patient.setAppointmentTime(patReq.getAppointmentTime());
-            patient.setChecked(patReq.getChecked() != null ? patReq.getChecked() : false);
-            checklist.addPatient(patient);
+        public List<ChecklistResponse> getAllChecklists(UUID userId) {
+                log.debug("Getting all checklists for user: {}", userId);
+                return checklistRecordRepository.findByUserIdOrderByCreatedDateDesc(userId).stream()
+                                .map(this::mapToResponse)
+                                .collect(Collectors.toList());
         }
 
-        ChecklistRecord saved = checklistRecordRepository.save(checklist);
-
-        // Add history record
-        Map<String, Object> details = new HashMap<>();
-        details.put("title", saved.getTitle());
-        details.put("patientsCount", saved.getPatients().size());
-        historyService.addHistory(
-                userId,
-                "checklist",
-                "Kontrol listesi oluşturuldu: " + saved.getTitle(),
-                details);
-
-        log.info("Checklist created: {}", saved.getId());
-        return mapToResponse(saved);
-    }
-
-    public ChecklistResponse updateChecklist(UUID id, UUID userId, ChecklistRequest request) {
-        log.debug("Updating checklist: {}", id);
-
-        ChecklistRecord checklist = checklistRecordRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Checklist not found"));
-
-        if (!checklist.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("Unauthorized access to checklist");
+        public ChecklistResponse getActiveChecklist(UUID userId) {
+                log.debug("Getting active checklist for user: {}", userId);
+                return checklistRecordRepository.findByIsCompletedFalseAndUserId(userId)
+                                .map(this::mapToResponse)
+                                .orElse(null);
         }
 
-        checklist.setTitle(request.getTitle());
+        public ChecklistResponse createChecklist(ChecklistRequest request, UUID userId) {
+                log.debug("Creating checklist for user: {}", userId);
 
-        // Clear existing patients and add new ones
-        checklist.getPatients().clear();
-        for (ChecklistRequest.PatientRequest patReq : request.getPatients()) {
-            ChecklistPatient patient = new ChecklistPatient();
-            patient.setName(patReq.getName());
-            patient.setNote(patReq.getNote());
-            patient.setPhone(patReq.getPhone());
-            patient.setCity(patReq.getCity());
-            patient.setHospital(patReq.getHospital());
-            patient.setAppointmentDate(patReq.getAppointmentDate());
-            patient.setAppointmentTime(patReq.getAppointmentTime());
-            patient.setChecked(patReq.getChecked() != null ? patReq.getChecked() : false);
-            checklist.addPatient(patient);
+                User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+                ChecklistRecord checklist = new ChecklistRecord();
+                checklist.setTitle(request.getTitle());
+                checklist.setCreatedDate(LocalDateTime.now());
+                checklist.setIsCompleted(false);
+                checklist.setUser(user);
+
+                // Add patients
+                for (ChecklistRequest.PatientRequest patReq : request.getPatients()) {
+                        ChecklistPatient patient = new ChecklistPatient();
+                        patient.setName(patReq.getName());
+                        patient.setNote(patReq.getNote());
+                        patient.setPhone(patReq.getPhone());
+                        patient.setCity(patReq.getCity());
+                        patient.setHospital(patReq.getHospital());
+                        patient.setAppointmentDate(parseDate(patReq.getDate()));
+                        patient.setAppointmentTime(parseTime(patReq.getTime()));
+                        patient.setChecked(patReq.getChecked() != null ? patReq.getChecked() : false);
+                        checklist.addPatient(patient);
+                }
+
+                ChecklistRecord saved = checklistRecordRepository.save(checklist);
+
+                // Add history record
+                Map<String, Object> details = new HashMap<>();
+                details.put("title", saved.getTitle());
+                details.put("patientsCount", saved.getPatients().size());
+                historyService.addHistory(
+                                userId,
+                                "checklist",
+                                "Kontrol listesi oluşturuldu: " + saved.getTitle(),
+                                details);
+
+                log.info("Checklist created: {}", saved.getId());
+                return mapToResponse(saved);
         }
 
-        ChecklistRecord updated = checklistRecordRepository.save(checklist);
-        log.info("Checklist updated: {}", id);
-        return mapToResponse(updated);
-    }
+        public ChecklistResponse updateChecklist(UUID id, UUID userId, ChecklistRequest request) {
+                log.debug("Updating checklist: {}", id);
 
-    public ChecklistResponse completeChecklist(UUID id, UUID userId) {
-        log.debug("Completing checklist: {}", id);
+                ChecklistRecord checklist = checklistRecordRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Checklist not found"));
 
-        ChecklistRecord checklist = checklistRecordRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Checklist not found"));
+                if (!checklist.getUser().getId().equals(userId)) {
+                        throw new IllegalArgumentException("Unauthorized access to checklist");
+                }
 
-        if (!checklist.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("Unauthorized access to checklist");
+                checklist.setTitle(request.getTitle());
+
+                // Clear existing patients and add new ones
+                checklist.getPatients().clear();
+                for (ChecklistRequest.PatientRequest patReq : request.getPatients()) {
+                        ChecklistPatient patient = new ChecklistPatient();
+                        patient.setName(patReq.getName());
+                        patient.setNote(patReq.getNote());
+                        patient.setPhone(patReq.getPhone());
+                        patient.setCity(patReq.getCity());
+                        patient.setHospital(patReq.getHospital());
+                        patient.setAppointmentDate(parseDate(patReq.getDate()));
+                        patient.setAppointmentTime(parseTime(patReq.getTime()));
+                        patient.setChecked(patReq.getChecked() != null ? patReq.getChecked() : false);
+                        checklist.addPatient(patient);
+                }
+
+                ChecklistRecord updated = checklistRecordRepository.save(checklist);
+
+                log.info("Checklist updated: {}", id);
+                return mapToResponse(updated);
         }
 
-        checklist.setIsCompleted(true);
-        checklist.setCompletedDate(LocalDateTime.now());
+        public ChecklistResponse completeChecklist(UUID id, UUID userId) {
+                log.debug("Completing checklist: {}", id);
 
-        ChecklistRecord updated = checklistRecordRepository.save(checklist);
-        log.info("Checklist completed: {}", id);
-        return mapToResponse(updated);
-    }
+                ChecklistRecord checklist = checklistRecordRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Checklist not found"));
 
-    private ChecklistResponse mapToResponse(ChecklistRecord checklist) {
-        return ChecklistResponse.builder()
-                .id(checklist.getId())
-                .title(checklist.getTitle())
-                .createdDate(checklist.getCreatedDate())
-                .completedDate(checklist.getCompletedDate())
-                .isCompleted(checklist.getIsCompleted())
-                .patients(checklist.getPatients().stream()
-                        .map(p -> ChecklistResponse.PatientInfo.builder()
+                if (!checklist.getUser().getId().equals(userId)) {
+                        throw new IllegalArgumentException("Unauthorized access to checklist");
+                }
+
+                checklist.setIsCompleted(true);
+                checklist.setCompletedDate(LocalDateTime.now());
+
+                ChecklistRecord updated = checklistRecordRepository.save(checklist);
+
+                // Add history record for completion
+                long checkedCount = updated.getPatients().stream()
+                                .filter(com.stok.app.entity.ChecklistPatient::getChecked)
+                                .count();
+                int totalCount = updated.getPatients().size();
+
+                Map<String, Object> details = new HashMap<>();
+                details.put("title", updated.getTitle());
+                details.put("checkedCount", checkedCount);
+                details.put("totalCount", totalCount);
+                details.put("createdDate", updated.getCreatedDate().toString());
+                details.put("completedDate", updated.getCompletedDate() != null ? updated.getCompletedDate().toString()
+                                : LocalDateTime.now().toString());
+                details.put("patients", updated.getPatients().stream()
+                                .map(this::mapPatientToInfo)
+                                .collect(Collectors.toList()));
+
+                historyService.addHistory(
+                                userId,
+                                "checklist",
+                                String.format("Kontrol listesi tamamlandı: %s (%d/%d hasta kontrol edildi)",
+                                                updated.getTitle(), checkedCount, totalCount),
+                                details);
+
+                log.info("Checklist completed: {}", id);
+                return mapToResponse(updated);
+        }
+
+        private ChecklistResponse.PatientInfo mapPatientToInfo(com.stok.app.entity.ChecklistPatient p) {
+                return ChecklistResponse.PatientInfo.builder()
                                 .id(p.getId())
                                 .name(p.getName())
                                 .note(p.getNote())
                                 .phone(p.getPhone())
                                 .city(p.getCity())
                                 .hospital(p.getHospital())
-                                .appointmentDate(p.getAppointmentDate())
-                                .appointmentTime(p.getAppointmentTime())
+                                .date(p.getAppointmentDate() != null ? p.getAppointmentDate().toString() : null)
+                                .time(p.getAppointmentTime() != null ? p.getAppointmentTime().toString() : null)
                                 .checked(p.getChecked())
-                                .build())
-                        .collect(Collectors.toList()))
-                .build();
-    }
+                                .build();
+        }
+
+        private ChecklistResponse mapToResponse(ChecklistRecord checklist) {
+                return ChecklistResponse.builder()
+                                .id(checklist.getId())
+                                .title(checklist.getTitle())
+                                .createdDate(checklist.getCreatedDate())
+                                .completedDate(checklist.getCompletedDate())
+                                .isCompleted(checklist.getIsCompleted())
+                                .patients(checklist.getPatients().stream()
+                                                .map(this::mapPatientToInfo)
+                                                .collect(Collectors.toList()))
+                                .build();
+        }
+
+        private java.time.LocalDate parseDate(String dateStr) {
+                if (dateStr == null || dateStr.isBlank())
+                        return null;
+                try {
+                        return java.time.LocalDate.parse(dateStr);
+                } catch (Exception e) {
+                        log.warn("Failed to parse date: {}", dateStr);
+                        return null;
+                }
+        }
+
+        private java.time.LocalTime parseTime(String timeStr) {
+                if (timeStr == null || timeStr.isBlank())
+                        return null;
+                try {
+                        // Handle cases like "10:00:00" or "10:00"
+                        if (timeStr.length() == 5) {
+                                return java.time.LocalTime.parse(timeStr);
+                        }
+                        return java.time.LocalTime.parse(timeStr);
+                } catch (Exception e) {
+                        log.warn("Failed to parse time: {}", timeStr);
+                        return null;
+                }
+        }
 }

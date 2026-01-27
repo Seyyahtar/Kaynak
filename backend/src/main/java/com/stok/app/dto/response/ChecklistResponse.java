@@ -38,8 +38,8 @@ public class ChecklistResponse {
         private String phone;
         private String city;
         private String hospital;
-        private LocalDate appointmentDate;
-        private LocalTime appointmentTime;
+        private String date;
+        private String time;
         private Boolean checked;
     }
 }

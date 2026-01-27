@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from './components/ui/sonner';
-import LoginPage from './components/LoginPage';
-import HomePage from './components/HomePage';
-import StockPage from './components/StockPage';
-import StockManagement from './components/StockManagement';
-import CaseEntry from './components/CaseEntry';
-import ChecklistPage from './components/ChecklistPage';
-import HistoryPage from './components/HistoryPage';
-import SettingsPage from './components/SettingsPage';
+import { toast } from 'sonner';
+import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
+import StockPage from './pages/StockPage';
+import StockManagement from './pages/StockManagement';
+import CaseEntry from './pages/CaseEntry';
+import ChecklistPage from './pages/ChecklistPage';
+import HistoryPage from './pages/HistoryPage';
+import SettingsPage from './pages/SettingsPage';
+import AdminPanelPage from './pages/AdminPanelPage';
+import AddUserPage from './pages/AddUserPage';
+import ManageUsersPage from './pages/ManageUsersPage';
 import { Page, StockItem } from './types';
 import { storage } from './utils/storage';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -15,7 +19,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [prefillData, setPrefillData] = useState<StockItem | null>(null);
+  const [prefillData, setPrefillData] = useState<StockItem[] | null>(null);
 
   useEffect(() => {
     // Kullanıcı girişi kontrolü
@@ -39,6 +43,31 @@ export default function App() {
       backButtonListener.remove();
     };
   }, [currentPage]);
+
+  useEffect(() => {
+    // Auto-sync when coming back online
+    const handleOnline = async () => {
+      console.log("Back online, starting sync...");
+      const toastId = toast.loading('İnternet bağlantısı algılandı. Senkronizasyon yapılıyor...');
+      try {
+        const { syncService } = await import('./services/syncService');
+        const result = await syncService.sync();
+        toast.dismiss(toastId);
+        if (result.pushed > 0 || result.pulled) {
+          toast.success(`Otomatik senkronizasyon tamamlandı. (Gönderilen: ${result.pushed})`);
+        } else {
+          toast.success('Senkronizasyon: Güncel');
+        }
+      } catch (error) {
+        toast.dismiss(toastId);
+        console.error("Auto-sync failed", error);
+        toast.error('Otomatik senkronizasyon başarısız');
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   const handleLogin = (username: string) => {
     setCurrentUser(username);
@@ -75,7 +104,9 @@ export default function App() {
       case 'home':
         return <HomePage onNavigate={handleNavigate} currentUser={currentUser} />;
       case 'stock':
-        return <StockPage onNavigate={handleNavigate} currentUser={currentUser} />;
+        return <StockPage onNavigate={handleNavigate} currentUser={currentUser} mode="view" />;
+      case 'stock-selection':
+        return <StockPage onNavigate={handleNavigate} currentUser={currentUser} mode="select" />;
       case 'stock-management':
         return <StockManagement onNavigate={handleNavigate} currentUser={currentUser} prefillData={prefillData} />;
       case 'case-entry':
@@ -86,6 +117,12 @@ export default function App() {
         return <HistoryPage onNavigate={handleNavigate} />;
       case 'settings':
         return <SettingsPage onNavigate={handleNavigate} currentUser={currentUser} onLogout={handleLogout} />;
+      case 'admin-panel':
+        return <AdminPanelPage onNavigate={handleNavigate} currentUser={currentUser} />;
+      case 'add-user':
+        return <AddUserPage onNavigate={handleNavigate} currentUser={currentUser} />;
+      case 'manage-users':
+        return <ManageUsersPage onNavigate={handleNavigate} currentUser={currentUser} />;
       default:
         return <HomePage onNavigate={handleNavigate} currentUser={currentUser} />;
     }

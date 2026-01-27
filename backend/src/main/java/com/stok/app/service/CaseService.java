@@ -25,8 +25,9 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 @RequiredArgsConstructor
-@Slf4j
 public class CaseService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CaseService.class);
 
     private final CaseRecordRepository caseRecordRepository;
     private final UserRepository userRepository;

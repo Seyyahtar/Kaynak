@@ -1,9 +1,6 @@
 package com.stok.app.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -17,12 +14,9 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "stock_items", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"material_name", "serial_lot_number", "user_id"})
+        @UniqueConstraint(columnNames = { "material_name", "serial_lot_number", "user_id" })
 })
 @EntityListeners(AuditingEntityListener.class)
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class StockItem {
 
     @Id
@@ -67,4 +61,111 @@ public class StockItem {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public StockItem() {
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getMaterialName() {
+        return materialName;
+    }
+
+    public void setMaterialName(String materialName) {
+        this.materialName = materialName;
+    }
+
+    public String getSerialLotNumber() {
+        return serialLotNumber;
+    }
+
+    public void setSerialLotNumber(String serialLotNumber) {
+        this.serialLotNumber = serialLotNumber;
+    }
+
+    public String getUbbCode() {
+        return ubbCode;
+    }
+
+    public void setUbbCode(String ubbCode) {
+        this.ubbCode = ubbCode;
+    }
+
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    public void setExpiryDate(LocalDate expiryDate) {
+        this.expiryDate = expiryDate;
+    }
+
+    public Integer getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
+
+    public LocalDate getDateAdded() {
+        return dateAdded;
+    }
+
+    public void setDateAdded(LocalDate dateAdded) {
+        this.dateAdded = dateAdded;
+    }
+
+    public String getFromField() {
+        return fromField;
+    }
+
+    public void setFromField(String fromField) {
+        this.fromField = fromField;
+    }
+
+    public String getToField() {
+        return toField;
+    }
+
+    public void setToField(String toField) {
+        this.toField = toField;
+    }
+
+    public String getMaterialCode() {
+        return materialCode;
+    }
+
+    public void setMaterialCode(String materialCode) {
+        this.materialCode = materialCode;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

@@ -3,9 +3,16 @@ const API_BASE_URL = '/api';
 export const api = {
     async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const url = `${API_BASE_URL}${endpoint}`;
+        // Get token from storage
+        // Circular dependency risk avoided by direct localStorage access or strictly typed storage import
+        // Using direct localStorage to be safe against circular deps with storage.ts if it imports api.ts
+        const token = localStorage.getItem('token');
+
         const defaultOptions: RequestInit = {
             headers: {
                 'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                ...options.headers,
             },
             ...options,
         };
