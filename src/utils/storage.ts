@@ -134,7 +134,8 @@ export const storage = {
   // Geçmiş işlemleri
   getHistory: async (): Promise<HistoryRecord[]> => {
     try {
-      const history = await historyService.getAll();
+      const user = storage.getUser();
+      const history = await historyService.getAll(user?.id);
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       return history;
     } catch (error) {

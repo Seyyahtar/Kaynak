@@ -18,16 +18,19 @@ interface NotificationListProps {
 export default function NotificationList({ onClose }: NotificationListProps) {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const currentUser = storage.getUser();
 
     const loadNotifications = async () => {
         if (!currentUser) return;
         setLoading(true);
+        setError(null);
         try {
             const data = await notificationService.getUserNotifications(currentUser.id);
             setNotifications(data);
-        } catch (error) {
-            console.error('Failed to load notifications', error);
+        } catch (err: any) {
+            console.error('Failed to load notifications', err);
+            setError(err.message || 'Bildirimler yüklenemedi');
         } finally {
             setLoading(false);
         }
@@ -39,7 +42,7 @@ export default function NotificationList({ onClose }: NotificationListProps) {
         // Refresh list while open
         const interval = setInterval(loadNotifications, 5000);
         return () => clearInterval(interval);
-    }, [currentUser]);
+    }, [currentUser?.id]);
 
     const handleAction = async (notificationId: string, action: NotificationActionStatus) => {
         try {
@@ -76,6 +79,13 @@ export default function NotificationList({ onClose }: NotificationListProps) {
                 <div className="overflow-y-auto p-2 space-y-2 bg-slate-50 flex-1">
                     {loading ? (
                         <div className="text-center py-4 text-slate-500 text-sm">Yükleniyor...</div>
+                    ) : error ? (
+                        <div className="text-center py-4 text-red-500 text-sm">
+                            <p>{error}</p>
+                            <Button variant="ghost" size="sm" onClick={loadNotifications} className="mt-2">
+                                Tekrar Dene
+                            </Button>
+                        </div>
                     ) : notifications.length === 0 ? (
                         <div className="text-center py-8 text-slate-500">
                             <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />

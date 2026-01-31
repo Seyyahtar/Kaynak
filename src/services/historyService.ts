@@ -2,8 +2,9 @@ import { api } from '../utils/api';
 import { HistoryRecord } from '../types';
 
 export const historyService = {
-    getAll: async () => {
-        const history = await api.get<any[]>('/history');
+    getAll: async (userId?: string) => {
+        const url = userId ? `/history?userId=${userId}` : '/history';
+        const history = await api.get<any[]>(url);
         return history.map(h => ({
             ...h,
             date: h.recordDate, // Map backend 'recordDate' to frontend 'date'

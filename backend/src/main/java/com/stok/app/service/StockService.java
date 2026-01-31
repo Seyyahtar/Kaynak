@@ -391,8 +391,23 @@ public class StockService {
                     new HashMap<String, Object>() {
                         {
                             put("count", items.size());
+                            put("items", items);
                         }
                     });
+
+            // Add history for sender - transfer completed
+            if (sender != null) {
+                historyService.addHistory(
+                        sender.getId(),
+                        "stock-remove",
+                        "Transfer tamamlandı -> " + receiver.getFullName() + " (" + items.size() + " kalem onaylandı)",
+                        new HashMap<String, Object>() {
+                            {
+                                put("receiver", receiver.getUsername());
+                                put("items", items);
+                            }
+                        });
+            }
 
         } else if (action == com.stok.app.entity.NotificationActionStatus.REJECTED) {
             // Return items to sender
