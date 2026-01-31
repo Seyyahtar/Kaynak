@@ -412,7 +412,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   };
 
   const handleRemoveStock = (item: StockItem) => {
-    onNavigate('stock-management', item);
+    onNavigate('stock-management', [item]);
   };
 
   const handleEdit = (item: StockItem) => {
@@ -586,7 +586,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
               onClick={() => onNavigate('stock-management')}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Stok Yönetimi
+              Stok Transferi
             </Button>
             <Button
               className="w-full justify-start"

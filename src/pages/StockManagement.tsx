@@ -43,12 +43,57 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
     }
   }, [currentUser, prefillData]);
 
-  const handleAddItem = (item: Partial<StockItem>) => {
-    setItems(prev => [...prev, item]);
+  const handleAddItem = async (item: Partial<StockItem>) => {
+    // Manuel eklenen stoklar stokta mevcut olmalı
+    if (!item.materialName || !item.serialLotNumber) {
+      toast.error('Malzeme adı ve Seri/Lot numarası zorunludur');
+      return;
+    }
+
+    try {
+      const isDuplicate = await storage.checkDuplicate(item.materialName, item.serialLotNumber);
+      if (!isDuplicate) {
+        toast.error('Bu malzeme stoklarınızda bulunmamaktadır. Sadece stokta olan malzemeleri transfer edebilirsiniz.');
+        return;
+      }
+
+      // Stokta varsa, ID ve diğer bilgileri çekmemiz lazım ki transfer yapabilelim.
+      // Ancak checkDuplicate sadece boolean dönüyor. 
+      // Doğru yöntem: Stoktan bu itemi bulmak.
+      const currentStock = await storage.getStock();
+      const stockItem = currentStock.find(s =>
+        s.materialName === item.materialName &&
+        s.serialLotNumber === item.serialLotNumber
+      );
+
+      if (!stockItem) {
+        toast.error('Stok bilgisi alınamadı.');
+        return;
+      }
+
+      // Add with ID from stock
+      setItems(prev => [...prev, { ...item, id: stockItem.id }]);
+      toast.success('Malzeme listeye eklendi');
+
+    } catch (error) {
+      console.error('Stok kontrolü hatası', error);
+      toast.error('Stok kontrolü yapılamadı');
+    }
   };
 
   const handleRemoveItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleQuantityChange = (index: number, newQuantity: string) => {
+    const qty = parseInt(newQuantity);
+    if (isNaN(qty) || qty < 1) return;
+
+    setItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], quantity: qty };
+      return newItems;
+    });
   };
 
   const handleSubmit = async () => {
@@ -222,7 +267,15 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
                       <td className="p-3">{item.materialName}</td>
                       <td className="p-3">{item.serialLotNumber}</td>
                       <td className="p-3">{item.expiryDate || '-'}</td>
-                      <td className="p-3 font-medium">{item.quantity}</td>
+                      <td className="p-3 font-medium">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(index, e.target.value)}
+                          className="w-20 h-8"
+                        />
+                      </td>
                       <td className="p-3">
                         <button
                           onClick={() => handleRemoveItem(index)}
