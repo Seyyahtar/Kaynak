@@ -21,14 +21,7 @@ export const userService = {
      */
     async getAllUsers(): Promise<User[]> {
         try {
-            const response = await fetch(`${API_BASE_URL}/users`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to fetch users');
-            }
-
-            return data.data;
+            return await api.get<User[]>('/users');
         } catch (error) {
             console.error('Error fetching users:', error);
             throw error;

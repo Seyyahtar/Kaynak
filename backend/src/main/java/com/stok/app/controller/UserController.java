@@ -21,7 +21,7 @@ import java.util.UUID;
  * Handles user management endpoints
  */
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
