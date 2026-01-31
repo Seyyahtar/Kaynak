@@ -952,19 +952,31 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
         )}
       </div >
 
-      {/* Selection Mode Fixed Footer - Buttons Only */}
+      {/* Selection Mode Floating Action Buttons */}
       {isSelectMode && (
-        <div className="fixed bottom-0 left-0 right-0 h-20 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 flex items-center justify-between px-6 border-t">
-          {/* Left: Cancel (Red Cross) */}
-          <Button variant="destructive" size="icon" onClick={handleCancelSelection} className="rounded-full w-12 h-12 shadow-lg hover:scale-105 transition-transform">
-            <X className="w-6 h-6" />
-          </Button>
+        <>
+          {/* Left: Cancel (Red Cross) - Floating */}
+          <div className="fixed bottom-4 left-4 z-50">
+            <Button
+              variant="destructive"
+              size="icon"
+              onClick={handleCancelSelection}
+              className="rounded-full w-14 h-14 shadow-xl hover:scale-105 transition-transform border-4 border-white"
+            >
+              <X className="w-8 h-8" />
+            </Button>
+          </div>
 
-          {/* Right: Confirm (Green Tick) */}
-          <Button onClick={handleConfirmSelection} className="bg-green-600 hover:bg-green-700 rounded-full w-12 h-12 shadow-lg hover:scale-105 transition-transform flex items-center justify-center">
-            <Check className="w-6 h-6 text-white" />
-          </Button>
-        </div>
+          {/* Right: Confirm (Green Tick) - Floating */}
+          <div className="fixed bottom-4 right-4 z-50">
+            <Button
+              onClick={handleConfirmSelection}
+              className="bg-green-600 hover:bg-green-700 rounded-full w-14 h-14 shadow-xl hover:scale-105 transition-transform flex items-center justify-center border-4 border-white"
+            >
+              <Check className="w-8 h-8 text-white" />
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );
