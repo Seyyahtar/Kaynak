@@ -39,7 +39,14 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
 
     // Load prefill data if exists (from multi-select)
     if (prefillData && Array.isArray(prefillData)) {
-      setItems(prev => [...prev, ...prefillData]);
+      // Map prefill data to maintain original stock as maxQuantity
+      // Default transfer quantity to 1
+      const mappedItems = prefillData.map(item => ({
+        ...item,
+        quantity: 1, // Default transfer amount
+        maxQuantity: item.quantity // Store original available stock
+      }));
+      setItems(prev => [...prev, ...mappedItems]);
     }
   }, [currentUser, prefillData]);
 
@@ -72,7 +79,12 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
       }
 
       // Add with ID from stock
-      setItems(prev => [...prev, { ...item, id: stockItem.id }]);
+      setItems(prev => [...prev, {
+        ...item,
+        id: stockItem.id,
+        quantity: 1, // Default to 1
+        maxQuantity: stockItem.quantity // Store max available
+      }]);
       toast.success('Malzeme listeye eklendi');
 
     } catch (error) {
@@ -91,7 +103,16 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
 
     setItems(prev => {
       const newItems = [...prev];
-      newItems[index] = { ...newItems[index], quantity: qty };
+      const item = newItems[index];
+      // Check against max limit if available
+      const max = (item as any).maxQuantity || 999999;
+
+      if (qty > max) {
+        toast.error(`Maksimum transfer edilebilir adet: ${max}`);
+        newItems[index] = { ...item, quantity: max };
+      } else {
+        newItems[index] = { ...item, quantity: qty };
+      }
       return newItems;
     });
   };
@@ -268,13 +289,21 @@ export default function StockManagement({ onNavigate, currentUser, prefillData }
                       <td className="p-3">{item.serialLotNumber}</td>
                       <td className="p-3">{item.expiryDate || '-'}</td>
                       <td className="p-3 font-medium">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(index, e.target.value)}
-                          className="w-20 h-8"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            max={(item as any).maxQuantity}
+                            value={item.quantity}
+                            onChange={(e) => handleQuantityChange(index, e.target.value)}
+                            className="w-20 h-8"
+                          />
+                          {(item as any).maxQuantity && (
+                            <span className="text-xs text-slate-500">
+                              / {(item as any).maxQuantity}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3">
                         <button
