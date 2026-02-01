@@ -84,6 +84,42 @@ public class HistoryService {
         log.info("All history records (and cases) deleted for user: {}", userId);
     }
 
+    public void deleteMostRecentHistoryByTypeAndDescription(UUID userId, String type, String descriptionPart) {
+        // Find most recent record matching criteria
+        List<HistoryRecord> records = historyRecordRepository.findByUserIdOrderByRecordDateDesc(userId);
+
+        for (HistoryRecord record : records) {
+            if (record.getType().equals(type) && record.getDescription().contains(descriptionPart)) {
+                log.info("Deleting outdated history record: {} - {}", record.getId(), record.getDescription());
+                historyRecordRepository.delete(record);
+                return; // Delete only the most recent one
+            }
+        }
+    }
+
+    public void deletePendingTransferRecord(UUID senderId, String receiverUsername) {
+        List<HistoryRecord> records = historyRecordRepository.findByUserIdOrderByRecordDateDesc(senderId);
+
+        for (HistoryRecord record : records) {
+            // Check type and basic description
+            if ("stock-remove".equals(record.getType()) &&
+                    record.getDescription() != null &&
+                    record.getDescription().startsWith("Stok transferi başlatıldı")) {
+
+                // Safely check details for receiver username
+                Map<String, Object> details = record.getDetailsJson();
+                if (details != null) {
+                    Object receiverObj = details.get("receiver");
+                    if (receiverObj != null && receiverUsername.equals(receiverObj.toString())) {
+                        log.info("Deleting pending transfer history record: {}", record.getId());
+                        historyRecordRepository.delete(record);
+                        return; // Delete only the most recent one
+                    }
+                }
+            }
+        }
+    }
+
     private HistoryRecordResponse mapToResponse(HistoryRecord record) {
         return HistoryRecordResponse.builder()
                 .id(record.getId())

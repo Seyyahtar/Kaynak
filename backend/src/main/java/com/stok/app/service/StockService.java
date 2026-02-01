@@ -58,24 +58,36 @@ public class StockService {
     }
 
     public StockItemResponse addStockItem(StockItemRequest request, UUID userId) {
-        return addStockItem(request, userId, true);
+        return addStockItem(request, userId, true, false); // Default: Don't allow merge for manual add
     }
 
-    private StockItemResponse addStockItem(StockItemRequest request, UUID userId, boolean addHistory) {
+    private StockItemResponse addStockItem(StockItemRequest request, UUID userId, boolean addHistory,
+            boolean allowMerge) {
         log.debug("Adding stock item: {} for user: {}", request.getMaterialName(), userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Check for duplicate
-        boolean exists = stockItemRepository.findByMaterialNameAndSerialLotNumberAndUserId(
+        java.util.Optional<StockItem> existing = stockItemRepository.findByMaterialNameAndSerialLotNumberAndUserId(
                 request.getMaterialName(),
                 request.getSerialLotNumber(),
-                userId).isPresent();
+                userId);
 
-        if (exists) {
-            throw new IllegalArgumentException("Stock item with same material name and serial number already exists: "
-                    + request.getMaterialName());
+        if (existing.isPresent()) {
+            if (allowMerge) {
+                log.info("Stock item exists, merging quantities. Item: {}", request.getMaterialName());
+                StockItem item = existing.get();
+                item.setQuantity(item.getQuantity() + request.getQuantity());
+                // Update other fields if necessary, or trust that same Lot means same
+                // properties
+                StockItem saved = stockItemRepository.save(item);
+                return mapToResponse(saved);
+            } else {
+                throw new IllegalArgumentException(
+                        "Stock item with same material name and serial number already exists: "
+                                + request.getMaterialName());
+            }
         }
 
         StockItem stockItem = new StockItem();
@@ -101,7 +113,7 @@ public class StockService {
             historyService.addHistory(
                     userId,
                     "stock-add",
-                    "Stok eklendi: " + saved.getMaterialName() + " (" + saved.getQuantity() + " adet)",
+                    "Stok eklendi: " + saved.getMaterialName(),
                     details);
         }
 
@@ -116,7 +128,8 @@ public class StockService {
         log.info("Bulk adding {} stock items for user: {}", requests.size(), userId);
 
         List<StockItemResponse> results = requests.stream()
-                .map(req -> addStockItem(req, userId, false))
+                .map(req -> addStockItem(req, userId, false, false)) // Default: false for bulk import too? Or true?
+                                                                     // Let's keep false effectively
                 .collect(Collectors.toList());
 
         // Add ONE single history record for the whole batch
@@ -366,7 +379,7 @@ public class StockService {
             // Add items to receiver
             for (Map<String, Object> itemData : items) {
                 StockItemRequest req = mapToRequest(itemData);
-                addStockItem(req, receiver.getId(), false);
+                addStockItem(req, receiver.getId(), false, true); // Allow Merge = TRUE
             }
 
             // Update Notification
@@ -397,6 +410,15 @@ public class StockService {
 
             // Add history for sender - transfer completed
             if (sender != null) {
+                // Remove the "Transfer Initiated" record first to avoid duplicates
+                try {
+                    historyService.deletePendingTransferRecord(
+                            sender.getId(),
+                            receiver.getUsername());
+                } catch (Exception e) {
+                    log.warn("Failed to delete previous history record: {}", e.getMessage());
+                }
+
                 historyService.addHistory(
                         sender.getId(),
                         "stock-remove",
@@ -414,7 +436,7 @@ public class StockService {
             if (sender != null) {
                 for (Map<String, Object> itemData : items) {
                     StockItemRequest tempReq = mapToRequest(itemData);
-                    addStockItem(tempReq, sender.getId(), false);
+                    addStockItem(tempReq, sender.getId(), false, true); // Allow Merge = TRUE for return too
                 }
 
                 // Notify Sender
@@ -426,10 +448,19 @@ public class StockService {
                         "Malzemeler stoğunuza iade edildi.",
                         com.stok.app.entity.NotificationActionStatus.REJECTED);
 
+                // Remove the "Transfer Initiated" record first
+                try {
+                    historyService.deletePendingTransferRecord(
+                            sender.getId(),
+                            receiver.getUsername());
+                } catch (Exception e) {
+                    log.warn("Failed to delete previous history record: {}", e.getMessage());
+                }
+
                 historyService.addHistory(
                         sender.getId(),
                         "stock-add",
-                        "Transfer reddedildi, stok iade alındı",
+                        "Transfer reddedildi, stok iade alındı: " + receiver.getFullName(), // Added description detail
                         new HashMap<String, Object>() {
                             {
                                 put("receiver", receiver.getUsername());
@@ -448,7 +479,7 @@ public class StockService {
         req.setMaterialName((String) data.get("materialName"));
         req.setSerialLotNumber((String) data.get("serialLotNumber"));
         req.setUbbCode((String) data.get("ubbCode"));
-        req.setQuantity((Integer) data.get("quantity"));
+        req.setQuantity(safeCastInteger(data.get("quantity")));
         req.setFromField((String) data.get("fromField"));
         req.setToField((String) data.get("toField"));
         req.setMaterialCode((String) data.get("materialCode"));
@@ -461,6 +492,23 @@ public class StockService {
         }
 
         return req;
+    }
+
+    private Integer safeCastInteger(Object obj) {
+        if (obj == null)
+            return 0;
+        if (obj instanceof Integer)
+            return (Integer) obj;
+        if (obj instanceof Number)
+            return ((Number) obj).intValue();
+        if (obj instanceof String) {
+            try {
+                return Integer.parseInt((String) obj);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return 0;
     }
 
     private java.time.LocalDate parseDate(Object dateObj) {
