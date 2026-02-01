@@ -284,19 +284,8 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
         return;
       }
 
-      // Sadece unique item'ları storage'a ekle
-      for (const item of uniqueItems) {
-        await storage.addStock(item);
-      }
-
-      // Geçmişe kaydet
-      await storage.addHistory({
-        id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        type: 'stock-add',
-        description: `Excel'den ${uniqueItems.length} adet malzeme içe aktarıldı${duplicates.length > 0 ? ` (${duplicates.length} adet atlandı)` : ''} - ${currentUser}`,
-        details: uniqueItems,
-      });
+      // Toplu olarak unique item'ları storage'a ekle (backend tek geçmiş kaydı oluşturur)
+      await storage.bulkAddStock(uniqueItems);
 
       const totalQuantity = uniqueItems.reduce((sum, item) => sum + item.quantity, 0);
       toast.success(`${uniqueItems.length} kayıt (${totalQuantity} adet) başarıyla içe aktarıldı${duplicates.length > 0 ? ` (${duplicates.length} kayıt atlandı)` : ''}`);

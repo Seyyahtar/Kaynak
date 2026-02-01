@@ -13,7 +13,7 @@ export const historyService = {
 
     create: (record: Partial<HistoryRecord>) => api.post<HistoryRecord>('/history', record),
 
-    delete: (id: string) => api.delete(`/history/${id}`),
+    delete: (id: string, userId?: string) => api.delete(`/history/${id}${userId ? `?userId=${userId}` : ''}`),
 
-    deleteAll: () => api.delete('/history/all'),
+    deleteAll: (userId?: string) => api.delete(`/history/all${userId ? `?userId=${userId}` : ''}`),
 };

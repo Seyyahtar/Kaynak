@@ -231,7 +231,8 @@ export const storage = {
 
   removeHistory: async (id: string) => {
     try {
-      await historyService.delete(id);
+      const user = storage.getUser();
+      await historyService.delete(id, user?.id);
       await storage.getHistory();
     } catch (error) {
       const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');

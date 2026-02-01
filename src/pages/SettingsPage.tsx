@@ -95,7 +95,8 @@ export default function SettingsPage({
         "Tüm geçmiş kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
       )
     ) {
-      await historyService.deleteAll();
+      const user = storage.getUser();
+      await historyService.deleteAll(user?.id);
       localStorage.setItem("medical_inventory_history", JSON.stringify([])); // Clear local storage as well for safety
       toast.success("Tüm geçmiş kayıtları temizlendi");
       const info = await getStorageInfo();
@@ -113,7 +114,7 @@ export default function SettingsPage({
         const user = storage.getUser();
         // Clear everything from Backend Database
         await stockService.deleteAll(user?.id);
-        await historyService.deleteAll(); // This also clears cases in our new backend implementation
+        await historyService.deleteAll(user?.id); // This also clears cases in our new backend implementation
 
         // Clear local storage
         localStorage.clear();
