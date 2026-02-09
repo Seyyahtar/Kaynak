@@ -74,7 +74,34 @@ export interface User {
   loginDate?: string; // For backwards compatibility
 }
 
-export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection';
+export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection' | 'product-list' | 'product-form';
+
+// Product Management Types
+export type FieldDataType = 'text' | 'number' | 'date' | 'mixed' | 'none';
+
+export interface CustomField {
+  id: string;
+  name: string;
+  dataType: FieldDataType;
+  isDefault: boolean; // true for predefined fields (Seri No, Lot No, etc.)
+}
+
+export interface Product {
+  id: string;
+  name: string; // Ürün Adı (required)
+  quantity?: number; // Miktar (optional)
+  // Default optional fields
+  serialNumber?: string; // Seri No
+  lotNumber?: string; // Lot No
+  expiryDate?: string; // SKT
+  ubbCode?: string; // UBB
+  productCode?: string; // Ürün Kodu
+  // Dynamic custom fields (key: field id, value: field value)
+  customFields: Record<string, any>;
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface TransferItemRequest {
   stockItemId: string;

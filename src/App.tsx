@@ -12,6 +12,8 @@ import SettingsPage from './pages/SettingsPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import AddUserPage from './pages/AddUserPage';
 import ManageUsersPage from './pages/ManageUsersPage';
+import ProductListPage from './pages/ProductListPage';
+import ProductFormPage from './pages/ProductFormPage';
 import { Page, StockItem } from './types';
 import { storage } from './utils/storage';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -19,7 +21,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [prefillData, setPrefillData] = useState<StockItem[] | null>(null);
+  const [prefillData, setPrefillData] = useState<any>(null);
 
   useEffect(() => {
     // Kullanıcı girişi kontrolü
@@ -31,16 +33,22 @@ export default function App() {
 
   useEffect(() => {
     // Android geri butonu için listener
-    const backButtonListener = CapacitorApp.addListener('backButton', () => {
+    let listenerHandle: any;
+
+    CapacitorApp.addListener('backButton', () => {
       if (currentPage !== 'home') {
         setCurrentPage('home');
       } else {
         CapacitorApp.exitApp();
       }
+    }).then(handle => {
+      listenerHandle = handle;
     });
 
     return () => {
-      backButtonListener.remove();
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
     };
   }, [currentPage]);
 
@@ -123,6 +131,10 @@ export default function App() {
         return <AddUserPage onNavigate={handleNavigate} currentUser={currentUser} />;
       case 'manage-users':
         return <ManageUsersPage onNavigate={handleNavigate} currentUser={currentUser} />;
+      case 'product-list':
+        return <ProductListPage onNavigate={handleNavigate} />;
+      case 'product-form':
+        return <ProductFormPage onNavigate={handleNavigate} editProduct={prefillData?.product} />;
       default:
         return <HomePage onNavigate={handleNavigate} currentUser={currentUser} />;
     }
