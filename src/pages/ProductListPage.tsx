@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Settings, Edit2, Trash2, Package, ArrowUpDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Plus, Settings, Pencil, Trash2, ArrowUpDown, Upload, Package, CheckSquare, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Page, Product, CustomField } from '@/types';
-import { productService } from '@/services/productService';
-import { customFieldService } from '@/services/customFieldService';
+import { productService } from '../services/productService';
+import { customFieldService } from '../services/customFieldService';
 import { toast } from 'sonner';
+import { parseExcelFile, validateExcelFile } from '../utils/excelParser';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,8 +30,15 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
     const [products, setProducts] = useState<Product[]>([]);
     const [fields, setFields] = useState<CustomField[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [sortField, setSortField] = useState<SortField>('index');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+    // Bulk Delete States
+    const [isMultiDeleteMode, setIsMultiDeleteMode] = useState(false);
+    const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+    const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+    const [showDeleteSelectedDialog, setShowDeleteSelectedDialog] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -64,6 +73,96 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
 
     const handleNewProduct = () => {
         onNavigate('product-form');
+    };
+
+    const handleExcelImport = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Validate file
+        const validation = validateExcelFile(file);
+        if (!validation.valid) {
+            toast.error(validation.error);
+            return;
+        }
+
+        try {
+            toast.loading('Excel dosyası okunuyor...');
+            const parsed = await parseExcelFile(file);
+
+            if (parsed.rows.length === 0) {
+                toast.error('Excel dosyası boş');
+                return;
+            }
+
+            if (parsed.rows.length > 1000) {
+                toast.error('Maksimum 1000 satır destekleniyor');
+                return;
+            }
+
+            // Navigate to import page
+            onNavigate('excel-import', parsed);
+
+            toast.dismiss();
+        } catch (error: any) {
+            toast.error(error.message || 'Dosya okunamadı');
+        }
+
+        // Reset input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+
+
+    // Bulk Delete Handlers
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedProducts(new Set(products.map(p => p.id)));
+        } else {
+            setSelectedProducts(new Set());
+        }
+    };
+
+    const handleToggleProduct = (id: string, checked: boolean) => {
+        const newSelected = new Set(selectedProducts);
+        if (checked) {
+            newSelected.add(id);
+        } else {
+            newSelected.delete(id);
+        }
+        setSelectedProducts(newSelected);
+    };
+
+    const handleDeleteAll = () => {
+        try {
+            products.forEach(p => productService.deleteProduct(p.id));
+            toast.success('Tüm ürünler silindi');
+            loadData();
+            setShowDeleteAllDialog(false);
+            setSelectedProducts(new Set());
+            setIsMultiDeleteMode(false);
+        } catch (error) {
+            toast.error('Silme işlemi başarısız');
+        }
+    };
+
+    const handleDeleteSelected = () => {
+        try {
+            selectedProducts.forEach(id => productService.deleteProduct(id));
+            toast.success(`${selectedProducts.size} ürün silindi`);
+            setSelectedProducts(new Set());
+            setIsMultiDeleteMode(false);
+            loadData();
+            setShowDeleteSelectedDialog(false);
+        } catch (error) {
+            toast.error('Silme işlemi başarısız');
+        }
     };
 
     const getFieldValue = (product: Product, field: CustomField): any => {
@@ -164,6 +263,37 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                 </div>
 
                 {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                    <Button
+                        onClick={() => setShowDeleteAllDialog(true)}
+                        variant="outline"
+                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Tüm Verileri Sil
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setIsMultiDeleteMode(!isMultiDeleteMode);
+                            setSelectedProducts(new Set());
+                        }}
+                        variant={isMultiDeleteMode ? "default" : "outline"}
+                        className={isMultiDeleteMode ? "bg-slate-800 text-white hover:bg-slate-700" : ""}
+                    >
+                        {isMultiDeleteMode ? (
+                            <>
+                                <X className="w-4 h-4 mr-2" />
+                                Seçimi İptal Et
+                            </>
+                        ) : (
+                            <>
+                                <CheckSquare className="w-4 h-4 mr-2" />
+                                Çoklu Sil
+                            </>
+                        )}
+                    </Button>
+                </div>
+
                 <div className="flex gap-2">
                     <Button
                         onClick={() => onNavigate('custom-fields')}
@@ -172,6 +302,14 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                     >
                         <Settings className="w-4 h-4 mr-2" />
                         Başlık Yönetimi
+                    </Button>
+                    <Button
+                        onClick={handleExcelImport}
+                        variant="outline"
+                        className="flex-1"
+                    >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Excel ile İçe Aktar
                     </Button>
                     <Button
                         onClick={handleNewProduct}
@@ -194,9 +332,17 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                         <p className="text-slate-600 mb-6">
                             Yeni ürün eklemek için yukarıdaki "Yeni Ürün" butonuna tıklayın
                         </p>
-                        <Button onClick={handleNewProduct}>
+                        <Button
+                            onClick={handleExcelImport}
+                            variant="outline"
+                            className="flex-1"
+                        >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Excel ile İçe Aktar
+                        </Button>
+                        <Button onClick={handleNewProduct} className="flex-1">
                             <Plus className="w-4 h-4 mr-2" />
-                            İlk Ürünü Ekle
+                            Yeni Ürün
                         </Button>
                     </Card>
                 ) : (
@@ -204,6 +350,14 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                         <table className="w-full bg-white rounded-lg border border-slate-200">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200">
+                                    {isMultiDeleteMode && (
+                                        <th className="px-4 py-3 w-10">
+                                            <Checkbox
+                                                checked={selectedProducts.size === products.length && products.length > 0}
+                                                onCheckedChange={handleSelectAll}
+                                            />
+                                        </th>
+                                    )}
                                     <th
                                         className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === 'index' ? 'text-black' : 'text-slate-700'
                                             }`}
@@ -255,6 +409,14 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                             <tbody>
                                 {sortedProducts.map((product, index) => (
                                     <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                        {isMultiDeleteMode && (
+                                            <td className="px-4 py-3">
+                                                <Checkbox
+                                                    checked={selectedProducts.has(product.id)}
+                                                    onCheckedChange={(checked: boolean) => handleToggleProduct(product.id, checked)}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="px-4 py-3 text-sm text-slate-600">
                                             {index + 1}
                                         </td>
@@ -277,7 +439,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                                     onClick={() => handleEditProduct(product)}
                                                     className="h-8 w-8"
                                                 >
-                                                    <Edit2 className="w-4 h-4 text-blue-600" />
+                                                    <Pencil className="w-4 h-4 text-blue-600" />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
@@ -318,6 +480,95 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Delete All Dialog */}
+            <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Tüm Verileri Sil</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            TÜM ÜRÜNLERİ silmek istediğinizden emin misiniz?
+                            Bu işlem geri alınamaz ve {products.length} ürün silinecek.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteAll}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                        >
+                            Tümünü Sil
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Selected Dialog */}
+            <AlertDialog open={showDeleteSelectedDialog} onOpenChange={setShowDeleteSelectedDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Seçili Ürünleri Sil</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {selectedProducts.size} ürünü silmek istediğinizden emin misiniz?
+                            Bu işlem geri alınamaz.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteSelected}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                        >
+                            Sil ({selectedProducts.size})
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Floating Buttons */}
+            {isMultiDeleteMode && (
+                <>
+                    {/* Left: Cancel Selection */}
+                    <div className="fixed bottom-6 left-6 z-50 animate-in slide-in-from-bottom-4">
+                        <Button
+                            onClick={() => {
+                                setIsMultiDeleteMode(false);
+                                setSelectedProducts(new Set());
+                            }}
+                            variant="outline"
+                            className="bg-white shadow-lg h-12 px-6 rounded-full border-slate-200 text-slate-700 hover:bg-slate-50"
+                        >
+                            <X className="w-5 h-5 mr-2" />
+                            İptal Et
+                        </Button>
+                    </div>
+
+                    {/* Right: Delete Selected */}
+                    {selectedProducts.size > 0 && (
+                        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
+                            <Button
+                                onClick={() => setShowDeleteSelectedDialog(true)}
+                                className="bg-red-600 hover:bg-red-700 text-white shadow-lg h-12 px-6 rounded-full"
+                                style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                            >
+                                <Trash2 className="w-5 h-5 mr-2" />
+                                Seçilenleri Sil ({selectedProducts.size})
+                            </Button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Hidden File Input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileChange}
+                className="hidden"
+            />
         </div>
     );
 }

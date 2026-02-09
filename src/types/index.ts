@@ -74,7 +74,22 @@ export interface User {
   loginDate?: string; // For backwards compatibility
 }
 
-export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection' | 'product-list' | 'product-form' | 'custom-fields';
+export type Page =
+  | 'home'
+  | 'stock'
+  | 'case-entry'
+  | 'history'
+  | 'settings'
+  | 'stock-management'
+  | 'checklist'
+  | 'admin-panel'
+  | 'add-user'
+  | 'manage-users'
+  | 'stock-selection'
+  | 'product-list'
+  | 'product-form'
+  | 'custom-fields'
+  | 'excel-import';
 
 // Product Management Types
 export type FieldDataType = 'text' | 'number' | 'date' | 'mixed' | 'none';
