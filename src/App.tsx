@@ -14,6 +14,7 @@ import AddUserPage from './pages/AddUserPage';
 import ManageUsersPage from './pages/ManageUsersPage';
 import ProductListPage from './pages/ProductListPage';
 import ProductFormPage from './pages/ProductFormPage';
+import CustomFieldsPage from './pages/CustomFieldsPage';
 import { Page, StockItem } from './types';
 import { storage } from './utils/storage';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -89,7 +90,7 @@ export default function App() {
   };
 
   const handleNavigate = (page: Page, data?: any) => {
-    if (page === 'stock-management' && data) {
+    if ((page === 'stock-management' || page === 'product-form') && data) {
       setPrefillData(data);
     } else {
       setPrefillData(null);
@@ -135,6 +136,8 @@ export default function App() {
         return <ProductListPage onNavigate={handleNavigate} />;
       case 'product-form':
         return <ProductFormPage onNavigate={handleNavigate} editProduct={prefillData?.product} />;
+      case 'custom-fields':
+        return <CustomFieldsPage onNavigate={handleNavigate} />;
       default:
         return <HomePage onNavigate={handleNavigate} currentUser={currentUser} />;
     }

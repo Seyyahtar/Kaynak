@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Settings, Edit2, Trash2, Package } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, Edit2, Trash2, Package, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Page, Product, CustomField } from '@/types';
 import { productService } from '@/services/productService';
 import { customFieldService } from '@/services/customFieldService';
-import CustomFieldsManager from '@/components/CustomFieldsManager';
 import { toast } from 'sonner';
 import {
     AlertDialog,
@@ -22,11 +21,15 @@ interface ProductListPageProps {
     onNavigate: (page: Page, data?: any) => void;
 }
 
+type SortField = 'index' | 'name' | 'quantity' | string; // string includes custom field IDs
+type SortDirection = 'asc' | 'desc';
+
 export default function ProductListPage({ onNavigate }: ProductListPageProps) {
     const [products, setProducts] = useState<Product[]>([]);
     const [fields, setFields] = useState<CustomField[]>([]);
-    const [showFieldsManager, setShowFieldsManager] = useState(false);
     const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+    const [sortField, setSortField] = useState<SortField>('index');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
     useEffect(() => {
         loadData();
@@ -63,40 +66,86 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         onNavigate('product-form');
     };
 
-    const getFieldValue = (product: Product, field: CustomField) => {
+    const getFieldValue = (product: Product, field: CustomField): any => {
         // Check default fields first
         switch (field.id) {
-            case 'serial_number': return product.serialNumber || '-';
-            case 'lot_number': return product.lotNumber || '-';
-            case 'expiry_date': return product.expiryDate || '-';
-            case 'ubb_code': return product.ubbCode || '-';
-            case 'product_code': return product.productCode || '-';
+            case 'serial_number': return product.serialNumber || '';
+            case 'lot_number': return product.lotNumber || '';
+            case 'expiry_date': return product.expiryDate || '';
+            case 'ubb_code': return product.ubbCode || '';
+            case 'product_code': return product.productCode || '';
             default:
                 // Check custom fields
-                return product.customFields[field.id] || '-';
+                return product.customFields[field.id] || '';
         }
     };
 
-    // Get all fields that are actually being used in products
+    // Get all fields that are actually being used in products AND are active
     const getUsedFields = () => {
         const usedFieldIds = new Set<string>();
 
-        // Always show default fields
-        customFieldService.getDefaultFields().forEach(f => usedFieldIds.add(f.id));
-
-        // Add custom fields that have values
-        products.forEach(product => {
-            Object.keys(product.customFields).forEach(fieldId => {
-                if (product.customFields[fieldId]) {
-                    usedFieldIds.add(fieldId);
-                }
-            });
+        // Always show active fields
+        fields.forEach(f => {
+            if (f.isActive) {
+                usedFieldIds.add(f.id);
+            }
         });
 
         return fields.filter(f => usedFieldIds.has(f.id));
     };
 
     const usedFields = getUsedFields();
+
+    // Sorting function
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            // If clicking the active field, reset to default (index)
+            setSortField('index');
+            setSortDirection('asc');
+        } else {
+            // New field, set to that field (ascending)
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    // Sort products
+    const sortedProducts = [...products].sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        if (sortField === 'index') {
+            // Use original index (no sorting actually)
+            return 0;
+        } else if (sortField === 'name') {
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+        } else if (sortField === 'quantity') {
+            aValue = a.quantity ?? -1;
+            bValue = b.quantity ?? -1;
+        } else {
+            // Custom field
+            const field = usedFields.find(f => f.id === sortField);
+            if (field) {
+                aValue = getFieldValue(a, field);
+                bValue = getFieldValue(b, field);
+
+                // Handle empty values
+                if (!aValue && !bValue) return 0;
+                if (!aValue) return 1;
+                if (!bValue) return -1;
+
+                // Convert to lowercase for text comparison
+                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+            }
+        }
+
+        // Compare
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -117,7 +166,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                 {/* Action Buttons */}
                 <div className="flex gap-2">
                     <Button
-                        onClick={() => setShowFieldsManager(true)}
+                        onClick={() => onNavigate('custom-fields')}
                         variant="outline"
                         className="flex-1"
                     >
@@ -155,18 +204,47 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                         <table className="w-full bg-white rounded-lg border border-slate-200">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200">
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                                        Sıra No
+                                    <th
+                                        className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === 'index' ? 'text-black' : 'text-slate-700'
+                                            }`}
+                                        onClick={() => handleSort('index')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Sıra No
+                                            <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === 'index' ? 'text-green-600' : 'text-slate-400'}`} />
+                                        </div>
                                     </th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                                        Ürün Adı
+                                    <th
+                                        className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === 'name' ? 'text-green-600' : 'text-slate-700'
+                                            }`}
+                                        onClick={() => handleSort('name')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Ürün Adı
+                                            <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === 'name' ? 'text-green-600' : 'text-slate-400'}`} />
+                                        </div>
                                     </th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                                        Miktar
+                                    <th
+                                        className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === 'quantity' ? 'text-green-600' : 'text-slate-700'
+                                            }`}
+                                        onClick={() => handleSort('quantity')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Miktar
+                                            <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === 'quantity' ? 'text-green-600' : 'text-slate-400'}`} />
+                                        </div>
                                     </th>
                                     {usedFields.map((field) => (
-                                        <th key={field.id} className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                                            {field.name}
+                                        <th
+                                            key={field.id}
+                                            className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === field.id ? 'text-green-600' : 'text-slate-700'
+                                                }`}
+                                            onClick={() => handleSort(field.id)}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                {field.name}
+                                                <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === field.id ? 'text-green-600' : 'text-slate-400'}`} />
+                                            </div>
                                         </th>
                                     ))}
                                     <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">
@@ -175,7 +253,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {products.map((product, index) => (
+                                {sortedProducts.map((product, index) => (
                                     <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-3 text-sm text-slate-600">
                                             {index + 1}
@@ -188,7 +266,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                         </td>
                                         {usedFields.map((field) => (
                                             <td key={field.id} className="px-4 py-3 text-sm text-slate-600">
-                                                {getFieldValue(product, field)}
+                                                {getFieldValue(product, field) || '-'}
                                             </td>
                                         ))}
                                         <td className="px-4 py-3 text-right">
@@ -219,15 +297,6 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                 )}
             </div>
 
-            {/* Custom Fields Manager Modal */}
-            <CustomFieldsManager
-                isOpen={showFieldsManager}
-                onClose={() => {
-                    setShowFieldsManager(false);
-                    loadData();
-                }}
-            />
-
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={!!deleteProductId} onOpenChange={() => setDeleteProductId(null)}>
                 <AlertDialogContent>
@@ -239,7 +308,11 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>İptal</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                        >
                             Sil
                         </AlertDialogAction>
                     </AlertDialogFooter>

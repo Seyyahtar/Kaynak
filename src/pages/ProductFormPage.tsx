@@ -244,13 +244,47 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
                                         </Label>
                                     </div>
                                     {selectedFieldIds.has(field.id) && (
-                                        <Input
-                                            type={getInputType(field.dataType)}
-                                            placeholder={`${field.name} giriniz`}
-                                            value={customFieldValues[field.id] || ''}
-                                            onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
-                                            className="ml-6"
-                                        />
+                                        <>
+                                            {field.dataType === 'date' ? (
+                                                <Input
+                                                    type="date"
+                                                    value={customFieldValues[field.id] || ''}
+                                                    onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+                                                    className="ml-6"
+                                                />
+                                            ) : field.dataType === 'number' ? (
+                                                <Input
+                                                    type="number"
+                                                    placeholder={`${field.name} giriniz`}
+                                                    value={customFieldValues[field.id] || ''}
+                                                    onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+                                                    className="ml-6"
+                                                />
+                                            ) : field.dataType === 'text' ? (
+                                                <Input
+                                                    type="text"
+                                                    placeholder={`${field.name} giriniz`}
+                                                    value={customFieldValues[field.id] || ''}
+                                                    onChange={(e) => {
+                                                        // Only allow text (letters, spaces, and common punctuation)
+                                                        const value = e.target.value;
+                                                        if (!/\d/.test(value) || value === '') {
+                                                            handleCustomFieldChange(field.id, value);
+                                                        }
+                                                    }}
+                                                    className="ml-6"
+                                                />
+                                            ) : (
+                                                // mixed or none - allow any input
+                                                <Input
+                                                    type="text"
+                                                    placeholder={`${field.name} giriniz`}
+                                                    value={customFieldValues[field.id] || ''}
+                                                    onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+                                                    className="ml-6"
+                                                />
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             ))}

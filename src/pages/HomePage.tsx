@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, FileText, History, Settings, ClipboardCheck, Shield } from 'lucide-react';
+import { Package, FileText, History, Settings, ClipboardCheck, Lock } from 'lucide-react';
 import NotificationList from '@/components/NotificationList';
 import { Bell } from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
@@ -118,41 +118,44 @@ export default function HomePage({ onNavigate, currentUser }: HomePageProps) {
                 </Card>
               );
             })}
-          </div>
 
-          {/* Admin Panel - Conditional */}
-          {canAccessAdminPanel && (
-            <Card
-              className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-r from-purple-500 to-indigo-600"
-              onClick={() => onNavigate('admin-panel')}
-            >
-              <div className="flex items-center justify-center gap-3">
-                <div className="bg-white/20 p-4 rounded-full">
-                  <Shield className="w-8 h-8 text-white" />
-                </div>
-                <span className="text-white font-semibold text-lg">Yönetici Paneli</span>
-              </div>
-            </Card>
-          )}
-
-          {/* Ayarlar - Tam genişlik */}
-          {menuItems.slice(4).map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card
-                key={item.id}
-                className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => onNavigate(item.id)}
-              >
-                <div className="flex items-center justify-center gap-3">
-                  <div className={`${item.color} p-4 rounded-full`}>
-                    <Icon className="w-8 h-8 text-white" />
+            {/* Ayarlar - Full Width */}
+            {menuItems.slice(4).map((item) => {
+              const Icon = item.icon;
+              return (
+                <Card
+                  key={item.id}
+                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer col-span-2"
+                  onClick={() => onNavigate(item.id)}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`${item.color} p-4 rounded-full`}>
+                      <Icon className="w-8 h-8 text-white" />
+                    </div>
+                    <span className="text-slate-800 text-center">{item.label}</span>
                   </div>
-                  <span className="text-slate-800">{item.label}</span>
+                </Card>
+              );
+            })}
+
+            {/* Admin Panel - Full Width - Yellow Background */}
+            {canAccessAdminPanel && (
+              <Card
+                className="p-6 hover:shadow-lg transition-shadow cursor-pointer col-span-2"
+                onClick={() => onNavigate('admin-panel')}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div
+                    className="bg-yellow-600 p-4 rounded-full shadow-lg border-2 border-white"
+                    style={{ backgroundColor: '#d97706' }}
+                  >
+                    <Lock className="w-8 h-8 text-white" />
+                  </div>
+                  <span className="text-slate-800 text-center font-semibold">Yönetici Paneli</span>
                 </div>
               </Card>
-            );
-          })}
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -74,7 +74,7 @@ export interface User {
   loginDate?: string; // For backwards compatibility
 }
 
-export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection' | 'product-list' | 'product-form';
+export type Page = 'home' | 'stock' | 'case-entry' | 'history' | 'settings' | 'stock-management' | 'checklist' | 'admin-panel' | 'add-user' | 'manage-users' | 'stock-selection' | 'product-list' | 'product-form' | 'custom-fields';
 
 // Product Management Types
 export type FieldDataType = 'text' | 'number' | 'date' | 'mixed' | 'none';
@@ -83,6 +83,7 @@ export interface CustomField {
   id: string;
   name: string;
   dataType: FieldDataType;
+  isActive?: boolean; // Controls visibility in lists
   isDefault: boolean; // true for predefined fields (Seri No, Lot No, etc.)
 }
 
