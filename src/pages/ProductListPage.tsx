@@ -33,6 +33,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [sortField, setSortField] = useState<SortField>('index');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+    const [importMode, setImportMode] = useState<'list' | 'update'>('list');
 
     // Bulk Delete States
     const [isMultiDeleteMode, setIsMultiDeleteMode] = useState(false);
@@ -75,7 +76,8 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         onNavigate('product-form');
     };
 
-    const handleExcelImport = () => {
+    const handleExcelImport = (mode: 'list' | 'update' = 'list') => {
+        setImportMode(mode);
         fileInputRef.current?.click();
     };
 
@@ -104,8 +106,8 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                 return;
             }
 
-            // Navigate to import page
-            onNavigate('excel-import', parsed);
+            // Navigate to import page with mode
+            onNavigate('excel-import', { ...parsed, importMode });
 
             toast.dismiss();
         } catch (error: any) {
@@ -305,12 +307,20 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                         Başlık Yönetimi
                     </Button>
                     <Button
-                        onClick={handleExcelImport}
+                        onClick={() => handleExcelImport('list')}
                         variant="outline"
                         className="flex-1"
                     >
                         <Upload className="w-4 h-4 mr-2" />
-                        Excel ile İçe Aktar
+                        Excel İle Liste İçeri Aktar
+                    </Button>
+                    <Button
+                        onClick={() => handleExcelImport('update')}
+                        variant="outline"
+                        className="flex-1"
+                    >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Excel İle Veri Aktar
                     </Button>
                     <Button
                         onClick={handleNewProduct}
@@ -333,18 +343,26 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                         <p className="text-slate-600 mb-6">
                             Yeni ürün eklemek için yukarıdaki "Yeni Ürün" butonuna tıklayın
                         </p>
-                        <Button
-                            onClick={handleExcelImport}
-                            variant="outline"
-                            className="flex-1"
-                        >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Excel ile İçe Aktar
-                        </Button>
-                        <Button onClick={handleNewProduct} className="flex-1">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Yeni Ürün
-                        </Button>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            <Button
+                                onClick={() => handleExcelImport('list')}
+                                variant="outline"
+                            >
+                                <Upload className="w-4 h-4 mr-2" />
+                                Excel İle Liste İçeri Aktar
+                            </Button>
+                            <Button
+                                onClick={() => handleExcelImport('update')}
+                                variant="outline"
+                            >
+                                <Upload className="w-4 h-4 mr-2" />
+                                Excel İle Veri Aktar
+                            </Button>
+                            <Button onClick={handleNewProduct}>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Yeni Ürün
+                            </Button>
+                        </div>
                     </Card>
                 ) : (
                     <div className="overflow-x-auto">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Plus, Upload, X, Check, Ban, Info } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, X, Check, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,6 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
         })
     );
     const [isImporting, setIsImporting] = useState(false);
-    const importMode = (importData as any).importMode || 'list';
 
     // Calculate all currently selected fields to prevent duplicates
     const selectedTargetFields = useMemo(() => {
@@ -250,22 +249,8 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
     const handleImport = async () => {
         // Validate mappings
         const hasProductName = mappings.some(m => m.targetField === 'name');
-        if (importMode === 'list' && !hasProductName) {
+        if (!hasProductName) {
             toast.error('Ürün Adı sütunu eşleştirilmelidir');
-            return;
-        }
-
-        const hasProductCode = mappings.some(m =>
-            m.targetField === 'product_code' ||
-            (m.subMappings && (
-                m.subMappings.seri === 'product_code' ||
-                m.subMappings.lot === 'product_code' ||
-                m.subMappings.skt === 'product_code' ||
-                m.subMappings.ubb === 'product_code'
-            ))
-        );
-        if (!hasProductCode) {
-            toast.error('Ürün Kodu sütunu eşleştirilmelidir');
             return;
         }
 
@@ -289,22 +274,23 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
 
             for (const mapping of newFields) {
                 if (mapping.newFieldName) {
-                    const newField = customFieldService.addCustomField(
-                        mapping.newFieldName,
-                        mapping.newFieldType || 'text'
-                    );
+                    const newField = await customFieldService.addCustomField({
+                        name: mapping.newFieldName,
+                        dataType: mapping.newFieldType || 'text',
+                        isActive: true
+                    });
                     newFieldsMap[mapping.excelColumn] = newField.id;
                 }
             }
 
             let successCount = 0;
             let errorCount = 0;
-            let notFoundCount = 0;
 
-            // Import/Update products
+            // Import products
             for (const row of rows) {
                 try {
                     const productData: any = {
+                        name: '',
                         customFields: {}
                     };
 
@@ -397,34 +383,9 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                         }
                     });
 
-                    if (importMode === 'update') {
-                        if (!productData.productCode) {
-                            errorCount++;
-                            continue;
-                        }
-
-                        const existingProduct = productService.getProductByProductCode(productData.productCode);
-                        if (existingProduct) {
-                            // Merge data
-                            const updatedData = {
-                                ...existingProduct,
-                                ...productData,
-                                customFields: {
-                                    ...existingProduct.customFields,
-                                    ...productData.customFields
-                                }
-                            };
-                            productService.updateProduct(existingProduct.id, updatedData);
-                            successCount++;
-                        } else {
-                            notFoundCount++;
-                        }
-                    } else {
-                        // Create mode
-                        if (productData.name) {
-                            await productService.createProduct(productData);
-                            successCount++;
-                        }
+                    if (productData.name) {
+                        productService.createProduct(productData);
+                        successCount++;
                     }
                 } catch (error) {
                     errorCount++;
@@ -433,16 +394,12 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
             }
 
             if (successCount > 0) {
-                toast.success(`${successCount} ürün başarıyla ${importMode === 'update' ? 'güncellendi' : 'içe aktarıldı'}`);
-                onNavigate('product-list');
-            }
-
-            if (notFoundCount > 0) {
-                toast.warning(`${notFoundCount} ürün kodu sistemde bulunamadığı için atlandı`);
+                toast.success(`${successCount} ürün başarıyla içe aktarıldı`);
+                onNavigate('product-list'); // Go back to product list
             }
 
             if (errorCount > 0) {
-                toast.warning(`${errorCount} satır işlenemedi`);
+                toast.warning(`${errorCount} satır aktarılamadı`);
             }
 
         } catch (error: any) {
@@ -470,9 +427,7 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                     value="name"
                     disabled={selectedTargetFields.has('name') && currentValue !== 'name'}
                 >
-                    {selectedTargetFields.has('name') && currentValue !== 'name'
-                        ? 'Ürün Adı (Seçildi)'
-                        : (importMode === 'update' ? 'Ürün Adı' : 'Ürün Adı (Zorunlu)')}
+                    {selectedTargetFields.has('name') && currentValue !== 'name' ? 'Ürün Adı (Seçildi)' : 'Ürün Adı (Zorunlu)'}
                 </SelectItem>
                 <SelectItem
                     value="quantity"
@@ -501,32 +456,20 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => onNavigate('product-list')}
+                        onClick={() => onNavigate('stock-management')}
                     >
                         <ArrowLeft className="w-6 h-6 text-slate-600" />
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">
-                            {importMode === 'update' ? 'Excel İle Veri Aktarımı' : 'Excel İle Liste İçe Aktarma'}
-                        </h1>
+                        <h1 className="text-2xl font-bold text-slate-800">Excel İçe Aktarma</h1>
                         <p className="text-slate-600">{rows.length} satır algılandı</p>
                     </div>
                 </div>
 
                 <Card className="p-6">
-                    {importMode === 'update' ? (
-                        <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-lg text-amber-800 text-sm flex gap-3">
-                            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-semibold mb-1">Veri Aktarım Modu (Güncelleme)</p>
-                                <p>Sistemdeki ürünler <strong>Ürün Kodu</strong> üzerinden eşleştirilecek ve seçtiğiniz sütunlardaki bilgiler mevcut ürünlere eklenecektir. Mevcut verileriniz korunur, sadece yeni sütunlar eklenir.</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mb-6 bg-blue-50 border border-blue-100 p-4 rounded-lg text-blue-800 text-sm">
-                            Her Excel sütununu uygun ürün başlığı ile eşleştirin. İstemediğiniz sütunlar için "Hariç Tut" seçeneğini kullanabilirsiniz.
-                        </div>
-                    )}
+                    <div className="mb-6 bg-blue-50 border border-blue-100 p-4 rounded-lg text-blue-800 text-sm">
+                        Her Excel sütununu uygun ürün başlığı ile eşleştirin. İstemediğiniz sütunlar için "Hariç Tut" seçeneğini kullanabilirsiniz.
+                    </div>
 
                     <div className="space-y-4">
                         {mappings.map((mapping, index) => {
@@ -842,7 +785,7 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                             ) : (
                                 <>
                                     <Upload className="w-4 h-4 mr-2" />
-                                    {importMode === 'update' ? `${rows.length} Satır Veriyi Aktar` : `${rows.length} Ürünü İçe Aktar`}
+                                    {rows.length} Ürünü İçe Aktar
                                 </>
                             )}
                         </Button>

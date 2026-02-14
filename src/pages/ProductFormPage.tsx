@@ -148,14 +148,25 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
                 {/* Required Field - Only Product Name */}
                 <Card className="p-4">
                     <h3 className="font-semibold text-slate-800 mb-4">Temel Bilgiler</h3>
-                    <div>
-                        <Label htmlFor="product-name">Ürün Adı *</Label>
-                        <Input
-                            id="product-name"
-                            placeholder="Ürün adını giriniz"
-                            value={productName}
-                            onChange={(e) => setProductName(e.target.value)}
-                        />
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="product-name">Ürün Adı *</Label>
+                            <Input
+                                id="product-name"
+                                placeholder="Ürün adını giriniz"
+                                value={productName}
+                                onChange={(e) => setProductName(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="product-code">Ürün Kodu *</Label>
+                            <Input
+                                id="product-code"
+                                placeholder="Ürün kodunu giriniz"
+                                value={productCode}
+                                onChange={(e) => setProductCode(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </Card>
 
@@ -209,15 +220,6 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
                                 placeholder="UBB kodunu giriniz"
                                 value={ubbCode}
                                 onChange={(e) => setUbbCode(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="product-code">Ürün Kodu</Label>
-                            <Input
-                                id="product-code"
-                                placeholder="Ürün kodunu giriniz"
-                                value={productCode}
-                                onChange={(e) => setProductCode(e.target.value)}
                             />
                         </div>
                     </div>

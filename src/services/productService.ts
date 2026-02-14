@@ -85,6 +85,13 @@ class ProductService {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredProducts));
     }
 
+    // Get product by Product Code
+    getProductByProductCode(productCode: string): Product | undefined {
+        const products = this.getProducts();
+        const code = productCode.trim();
+        return products.find(p => p.productCode === code);
+    }
+
     // Check if a product name already exists
     isProductNameExists(name: string, excludeId?: string): boolean {
         const products = this.getProducts();
@@ -92,6 +99,17 @@ class ProductService {
 
         return products.some(product =>
             product.name.toLowerCase() === normalizedName && product.id !== excludeId
+        );
+    }
+
+    // Check if a product code already exists
+    isProductCodeExists(code: string, excludeId?: string): boolean {
+        if (!code) return false;
+        const products = this.getProducts();
+        const normalizedCode = code.trim();
+
+        return products.some(product =>
+            product.productCode === normalizedCode && product.id !== excludeId
         );
     }
 
