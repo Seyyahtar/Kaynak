@@ -62,6 +62,11 @@ export default function CustomFieldsPage({ onNavigate }: CustomFieldsPageProps) 
         loadFields();
     };
 
+    const handleToggleClassification = (fieldId: string) => {
+        customFieldService.toggleFieldClassification(fieldId);
+        loadFields();
+    };
+
     const handleDeleteField = (fieldId: string) => {
         setDeleteFieldId(fieldId);
     };
@@ -164,24 +169,43 @@ export default function CustomFieldsPage({ onNavigate }: CustomFieldsPageProps) 
                             <Card key={field.id} className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-4">
                                             {/* Active/Passive Toggle */}
-                                            <div
-                                                className={`w-6 h-6 rounded border flex items-center justify-center cursor-pointer transition-colors ${field.isActive ? 'bg-green-500 border-green-600' : 'bg-white border-slate-300'
-                                                    }`}
-                                                onClick={() => handleToggleField(field.id)}
-                                            >
-                                                {field.isActive && <Check className="w-4 h-4 text-white" />}
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className={`w-6 h-6 rounded border flex items-center justify-center cursor-pointer transition-colors ${field.isActive ? 'bg-green-500 border-green-600' : 'bg-white border-slate-300'
+                                                        }`}
+                                                    onClick={() => handleToggleField(field.id)}
+                                                >
+                                                    {field.isActive && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <span className="text-xs text-slate-500 font-medium">Aktif</span>
                                             </div>
 
-                                            <span className={`font-medium ${field.isActive ? 'text-slate-800' : 'text-slate-400'}`}>
-                                                {field.name}
-                                            </span>
-                                            {field.isDefault && (
-                                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                    Varsayılan
+                                            {/* Classification Toggle */}
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className={`w-6 h-6 rounded border flex items-center justify-center cursor-pointer transition-colors ${field.isClassified ? 'bg-blue-500 border-blue-600' : 'bg-white border-slate-300'
+                                                        }`}
+                                                    onClick={() => handleToggleClassification(field.id)}
+                                                >
+                                                    {field.isClassified && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <span className="text-xs text-slate-500 font-medium truncate max-w-[150px]" title={`Örn: ${field.name.substring(0, 1).toUpperCase()}`}>
+                                                    Sınıflandır ({field.name.substring(0, 1).toUpperCase()})
                                                 </span>
-                                            )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 ml-4">
+                                                <span className={`font-medium ${field.isActive ? 'text-slate-800' : 'text-slate-400'}`}>
+                                                    {field.name}
+                                                </span>
+                                                {field.isDefault && (
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                        Varsayılan
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <span className="text-sm text-slate-600 ml-8">
                                             {getDataTypeLabel(field.dataType)}

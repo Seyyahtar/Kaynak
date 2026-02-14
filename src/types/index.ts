@@ -100,6 +100,7 @@ export interface CustomField {
   dataType: FieldDataType;
   isActive?: boolean; // Controls visibility in lists
   isDefault: boolean; // true for predefined fields (Seri No, Lot No, etc.)
+  isClassified?: boolean; // If true, display first 2 letters of header in list
 }
 
 export interface Product {

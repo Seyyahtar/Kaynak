@@ -432,11 +432,18 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                         <td className="px-4 py-3 text-sm font-medium text-slate-800">
                                             {product.name}
                                         </td>
-                                        {usedFields.map((field) => (
-                                            <td key={field.id} className="px-4 py-3 text-sm text-slate-600">
-                                                {getFieldValue(product, field) || '-'}
-                                            </td>
-                                        ))}
+                                        {usedFields.map((field) => {
+                                            const rawValue = getFieldValue(product, field);
+                                            const displayValue = rawValue && field.isClassified
+                                                ? field.name.substring(0, 1).toUpperCase()
+                                                : (rawValue || '-');
+
+                                            return (
+                                                <td key={field.id} className="px-4 py-3 text-sm text-slate-600">
+                                                    {displayValue}
+                                                </td>
+                                            );
+                                        })}
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <Button

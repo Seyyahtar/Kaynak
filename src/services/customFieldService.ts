@@ -19,7 +19,8 @@ class CustomFieldService {
         const allFields = [...DEFAULT_FIELDS, ...customFields];
         return allFields.map(f => ({
             ...f,
-            isActive: this.isFieldActive(f.id)
+            isActive: this.isFieldActive(f.id),
+            isClassified: this.isFieldClassified(f.id)
         }));
     }
 
@@ -113,6 +114,42 @@ class CustomFieldService {
     isFieldActive(fieldId: string): boolean {
         const inactiveIds = JSON.parse(localStorage.getItem('inactive_fields') || '[]');
         return !inactiveIds.includes(fieldId);
+    }
+
+    // Toggle field classification status
+    toggleFieldClassification(fieldId: string): void {
+        const customFields = this.getUserCustomFields();
+        const userFieldIndex = customFields.findIndex(f => f.id === fieldId);
+
+        if (userFieldIndex !== -1) {
+            customFields[userFieldIndex].isClassified = !customFields[userFieldIndex].isClassified;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(customFields));
+        } else {
+            // It might be a default field. We need to store classified status for defaults too.
+            const classifiedIds = JSON.parse(localStorage.getItem('classified_fields') || '[]');
+            const index = classifiedIds.indexOf(fieldId);
+
+            if (index === -1) {
+                classifiedIds.push(fieldId);
+            } else {
+                classifiedIds.splice(index, 1);
+            }
+
+            localStorage.setItem('classified_fields', JSON.stringify(classifiedIds));
+        }
+    }
+
+    // Load classification status
+    isFieldClassified(fieldId: string): boolean {
+        const customFields = this.getUserCustomFields();
+        const userField = customFields.find(f => f.id === fieldId);
+
+        if (userField) {
+            return !!userField.isClassified;
+        }
+
+        const classifiedIds = JSON.parse(localStorage.getItem('classified_fields') || '[]');
+        return classifiedIds.includes(fieldId);
     }
 
     // Check if a field name already exists
