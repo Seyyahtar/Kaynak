@@ -1,17 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Plus, Minus, ArrowLeft, Upload, Download, Trash2, ArrowRightLeft, Edit, Check, Menu, Filter, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Minus, ArrowLeft, Upload, Download, Trash2, ArrowRightLeft, Edit, Check, Menu, Filter, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StockItem, Page } from '@/types';
 import { storage } from '@/utils/storage';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { importFromExcel, exportToExcel, exportImplantList } from '@/utils/excelUtils';
 import DeviceGrouping from '@/components/DeviceGrouping';
+import { productService } from '@/services/productService';
+import { customFieldService } from '@/services/customFieldService';
+import { Product, CustomField } from '@/types';
+
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DEFAULT_IMPLANT_TEMPLATE_URL = '/Implant list.xlsx';
 const DEFAULT_IMPLANT_TEMPLATE_NAME = 'Implant list.xlsx';
+
+const STORAGE_KEY_COLUMNS = 'stock_visible_columns';
+const STORAGE_KEY_INACTIVE = 'inactive_fields';
+const STORAGE_KEY_CLASSIFIED = 'classified_fields';
 
 interface StockPageProps {
   onNavigate: (page: Page, data?: any) => void;
@@ -60,9 +77,84 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const [implantTemplateData, setImplantTemplateData] = useState<ArrayBuffer | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set()); // For selection mode
 
+  // Dynamic Data State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+
+  // Base Stock Columns (Non-dynamic part)
+  const baseStockColumns = [
+    { id: 'serialLotNumber', label: 'Seri/Lot No' },
+    { id: 'ubbCode', label: 'UBB Kodu' },
+    { id: 'expiryDate', label: 'Son Kullanma Tarihi' },
+    { id: 'quantity', label: 'Miktar' },
+    { id: 'from', label: 'Kimden' },
+    { id: 'to', label: 'Kime' },
+    { id: 'materialCode', label: 'Malzeme Kodu' },
+    { id: 'dateAdded', label: 'Eklenme Tarihi' },
+  ];
+
+  // Dynamic Stock Columns (Merge base + active custom fields)
+  // We exclude fields that are already in base (quality, serial_number, lot_number, expiry_date, ubb_code, product_code)
+  const dynamicColumns = [
+    ...baseStockColumns,
+    ...customFields
+      .filter(f => !['quantity', 'serial_number', 'lot_number', 'expiry_date', 'ubb_code', 'product_code'].includes(f.id) && f.isActive)
+      .map(f => ({ id: f.id, label: f.name }))
+  ];
+
+  // Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(dynamicColumns.map(c => c.id)));
+  const [isHeadersOpen, setIsHeadersOpen] = useState(false);
+
   useEffect(() => {
     loadStock();
+    loadVisibilitySettings();
+    loadDynamicData();
   }, []);
+
+  const loadDynamicData = () => {
+    setProducts(productService.getProducts());
+    setCustomFields(customFieldService.getCustomFields());
+  };
+
+  const loadVisibilitySettings = () => {
+    const saved = localStorage.getItem(STORAGE_KEY_COLUMNS);
+    if (saved) {
+      try {
+        const savedArray = JSON.parse(saved);
+        // Important: When dynamic fields are added, they should be visible by default 
+        // if not explicitly hidden or if this is the first time we see them.
+        setVisibleColumns(new Set(savedArray));
+      } catch (e) {
+        console.error('Visibility settings load error', e);
+      }
+    }
+  };
+
+  const toggleColumnVisibility = (columnId: string) => {
+    const newVisible = new Set(visibleColumns);
+    if (newVisible.has(columnId)) {
+      newVisible.delete(columnId);
+    } else {
+      newVisible.add(columnId);
+    }
+    const updated = new Set(newVisible);
+    setVisibleColumns(updated);
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(Array.from(updated)));
+  };
+
+  const resetVisibility = () => {
+    const defaultColumns = new Set(dynamicColumns.map(c => c.id));
+    setVisibleColumns(defaultColumns);
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(Array.from(defaultColumns)));
+  };
+
+  const showAllColumns = () => {
+    const allIds = dynamicColumns.map(c => c.id);
+    const allSet = new Set(allIds);
+    setVisibleColumns(allSet);
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(allIds));
+  };
 
   useEffect(() => {
     if (implantTemplateData) return;
@@ -636,6 +728,49 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
               className="hidden"
             />
 
+            {/* Başlık Özelleştirme - Menu Icinde (Accordion) */}
+            <div className="pt-2 border-t mt-2">
+              <div
+                className="w-full flex items-center justify-between p-2 cursor-pointer hover:bg-gray-50 rounded"
+                onClick={() => setIsHeadersOpen(!isHeadersOpen)}
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-500" />
+                  <span className="text-slate-700">Başlıkları Özelleştir</span>
+                </div>
+                {isHeadersOpen ? (
+                  <ChevronUp className="w-4 h-4 text-slate-500" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                )}
+              </div>
+              {isHeadersOpen && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-4">
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={showAllColumns} className="flex-1 text-[10px] h-7">Tümünü Göster</Button>
+                    <Button variant="outline" size="sm" onClick={resetVisibility} className="flex-1 text-[10px] h-7">Varsayılana Dön</Button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {dynamicColumns.map((column) => (
+                      <div key={column.id} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`col-${column.id}`}
+                          checked={visibleColumns.has(column.id)}
+                          onCheckedChange={() => toggleColumnVisibility(column.id)}
+                        />
+                        <Label
+                          htmlFor={`col-${column.id}`}
+                          className="text-xs font-medium cursor-pointer flex-1"
+                        >
+                          {column.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Cihaz Adetleri - Menu Icinde */}
             <div className="pt-2 border-t">
               <div
@@ -767,106 +902,125 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                             {isMaterialExpanded && (
                               <div className="bg-white overflow-x-auto ml-12">
                                 <table className="w-full text-left">
-                                  <thead className="bg-gray-100">
-                                    <tr>
-                                      <th className="p-2 border-r text-slate-700">Seri/Lot</th>
-                                      <th className="p-2 border-r text-slate-700">UBB Kodu</th>
-                                      <th
-                                        className={`p-2 border-r ${getSortHeaderClass(sortKey, 'expiryDate')}`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSort(sortKey, 'expiryDate');
-                                        }}
-                                      >
-                                        SKT
-                                      </th>
-                                      <th
-                                        className={`p-2 border-r ${getSortHeaderClass(sortKey, 'quantity')}`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSort(sortKey, 'quantity');
-                                        }}
-                                      >
-                                        Miktar
-                                      </th>
-                                      <th className="p-2 text-slate-700">{isSelectMode ? 'Seç' : 'İşlemler'}</th>
+                                  <thead>
+                                    <tr className="bg-gray-100">
+                                      {dynamicColumns.map(col => visibleColumns.has(col.id) && (
+                                        <th
+                                          key={col.id}
+                                          className={`p-2 border-r text-slate-700 text-sm font-semibold ${(col.id === 'expiryDate' || col.id === 'quantity') ? getSortHeaderClass(sortKey, col.id as SortField) : ''}`}
+                                          onClick={(col.id === 'expiryDate' || col.id === 'quantity') ? (e) => {
+                                            e.stopPropagation();
+                                            handleSort(sortKey, col.id as SortField);
+                                          } : undefined}
+                                        >
+                                          {col.label}
+                                        </th>
+                                      ))}
+                                      <th className="p-2 text-slate-700 text-sm font-semibold">{isSelectMode ? 'Seç' : 'İşlemler'}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {sortedItems.map((item) => {
                                       const isEditing = editingItemId === item.id;
                                       const isSelected = selectedItems.has(item.id);
+                                      const product = products.find(p => p.name === material.fullName);
 
                                       return (
                                         <tr key={item.id}
                                           className={`border-t hover:bg-gray-50 cursor-pointer ${isSelectMode && isSelected ? 'bg-green-50' : ''}`}
                                           onClick={isSelectMode ? () => toggleItemSelection(item) : undefined}
                                         >
-                                          <td className="p-2 border-r text-slate-600">
-                                            {isEditing ? (
-                                              <Input
-                                                value={editingValues.serialLotNumber || ''}
-                                                onChange={(e) => setEditingValues({
-                                                  ...editingValues,
-                                                  serialLotNumber: e.target.value
-                                                })}
-                                                className="h-8"
-                                              />
-                                            ) : (
-                                              item.serialLotNumber
-                                            )}
-                                          </td>
-                                          <td className="p-2 border-r text-slate-600">
-                                            {isEditing ? (
-                                              <Input
-                                                value={editingValues.ubbCode || ''}
-                                                onChange={(e) => setEditingValues({
-                                                  ...editingValues,
-                                                  ubbCode: e.target.value
-                                                })}
-                                                className="h-8"
-                                              />
-                                            ) : (
-                                              item.ubbCode
-                                            )}
-                                          </td>
-                                          <td className="p-2 border-r text-slate-600">
-                                            {isEditing ? (
-                                              <Input
-                                                type="date"
-                                                value={editingValues.expiryDate || ''}
-                                                onChange={(e) => setEditingValues({
-                                                  ...editingValues,
-                                                  expiryDate: e.target.value
-                                                })}
-                                                className="h-8"
-                                              />
-                                            ) : (
-                                              item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('tr-TR') : '-'
-                                            )}
-                                          </td>
-                                          <td className="p-2 border-r text-slate-600">
-                                            {isEditing ? (
-                                              <Input
-                                                type="number"
-                                                value={editingValues.quantity || ''}
-                                                onChange={(e) => setEditingValues({
-                                                  ...editingValues,
-                                                  quantity: parseInt(e.target.value)
-                                                })}
-                                                className="h-8"
-                                                min="1"
-                                              />
-                                            ) : (
-                                              item.quantity
-                                            )}
-                                          </td>
-                                          <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                          {visibleColumns.has('serialLotNumber') && (
+                                            <td className="p-2 border-r text-slate-600">
+                                              {isEditing ? (
+                                                <Input
+                                                  value={editingValues.serialLotNumber || ''}
+                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                    ...editingValues,
+                                                    serialLotNumber: e.target.value
+                                                  })}
+                                                  className="h-8"
+                                                />
+                                              ) : (
+                                                item.serialLotNumber
+                                              )}
+                                            </td>
+                                          )}
+                                          {visibleColumns.has('ubbCode') && (
+                                            <td className="p-2 border-r text-slate-600">
+                                              {isEditing ? (
+                                                <Input
+                                                  value={editingValues.ubbCode || ''}
+                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                    ...editingValues,
+                                                    ubbCode: e.target.value
+                                                  })}
+                                                  className="h-8"
+                                                />
+                                              ) : (
+                                                item.ubbCode
+                                              )}
+                                            </td>
+                                          )}
+                                          {visibleColumns.has('expiryDate') && (
+                                            <td className="p-2 border-r text-slate-600">
+                                              {isEditing ? (
+                                                <Input
+                                                  type="date"
+                                                  value={editingValues.expiryDate || ''}
+                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                    ...editingValues,
+                                                    expiryDate: e.target.value
+                                                  })}
+                                                  className="h-8"
+                                                />
+                                              ) : (
+                                                item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('tr-TR') : '-'
+                                              )}
+                                            </td>
+                                          )}
+                                          {visibleColumns.has('quantity') && (
+                                            <td className="p-2 border-r text-slate-600">
+                                              {isEditing ? (
+                                                <Input
+                                                  type="number"
+                                                  value={editingValues.quantity || ''}
+                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                    ...editingValues,
+                                                    quantity: parseInt(e.target.value)
+                                                  })}
+                                                  className="h-8"
+                                                  min="1"
+                                                />
+                                              ) : (
+                                                item.quantity
+                                              )}
+                                            </td>
+                                          )}
+                                          {visibleColumns.has('from') && <td className="p-2 border-r text-slate-600">{item.from || '-'}</td>}
+                                          {visibleColumns.has('to') && <td className="p-2 border-r text-slate-600">{item.to || '-'}</td>}
+                                          {visibleColumns.has('materialCode') && <td className="p-2 border-r text-slate-600">{item.materialCode || '-'}</td>}
+                                          {visibleColumns.has('dateAdded') && <td className="p-2 border-r text-slate-600">{item.dateAdded ? new Date(item.dateAdded).toLocaleDateString('tr-TR') : '-'}</td>}
+
+                                          {/* Dynamic Custom Fields from Product */}
+                                          {customFields
+                                            .filter(f => !['quantity', 'serial_number', 'lot_number', 'expiry_date', 'ubb_code', 'product_code'].includes(f.id) && f.isActive)
+                                            .map(field => visibleColumns.has(field.id) && (
+                                              <td key={field.id} className="p-2 border-r text-slate-600">
+                                                {(() => {
+                                                  const rawValue = product?.customFields?.[field.id] || '-';
+                                                  if (rawValue === '-' || !field.isClassified) return rawValue;
+                                                  return `${field.name.substring(0, 1).toUpperCase()}: ${rawValue}`;
+                                                })()}
+                                              </td>
+                                            ))}
+
+                                          <td className="p-2 text-center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                             {isEditing ? (
                                               <Button
                                                 size="sm"
                                                 variant="default"
-                                                onClick={(e) => {
+                                                onClick={(e: React.MouseEvent) => {
                                                   e.stopPropagation();
                                                   handleSaveEdit(item);
                                                 }}
@@ -888,7 +1042,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                                 <Button
                                                   size="sm"
                                                   variant="outline"
-                                                  onClick={(e) => {
+                                                  onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     handleEdit(item);
                                                   }}
@@ -899,7 +1053,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                                 <Button
                                                   size="sm"
                                                   variant="outline"
-                                                  onClick={(e) => {
+                                                  onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     handleRemoveStock(item);
                                                   }}
@@ -910,7 +1064,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                                 <Button
                                                   size="sm"
                                                   variant="destructive"
-                                                  onClick={(e) => {
+                                                  onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     handleDeleteItem(item);
                                                   }}

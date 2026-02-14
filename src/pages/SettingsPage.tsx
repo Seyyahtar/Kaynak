@@ -80,12 +80,20 @@ export default function SettingsPage({
         "Tüm stok kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
       )
     ) {
-      const user = storage.getUser();
-      await stockService.deleteAll(user?.id);
-      await storage.saveStock([]); // Clear local storage as well
-      toast.success("Tüm stok kayıtları temizlendi");
-      const info = await getStorageInfo();
-      setStorageInfo(info);
+      const toastId = toast.loading("Stok kayıtları temizleniyor...");
+      try {
+        const user = storage.getUser();
+        await stockService.deleteAll(user?.id);
+        await storage.saveStock([]); // Clear local storage as well
+        toast.dismiss(toastId);
+        toast.success("Tüm stok kayıtları temizlendi");
+        const info = await getStorageInfo();
+        setStorageInfo(info);
+      } catch (error: any) {
+        toast.dismiss(toastId);
+        console.error("Stok temizleme hatası", error);
+        toast.error(error.message || "Stok kayıtları temizlenemedi. Lütfen bağlantınızı kontrol edin.");
+      }
     }
   };
 
@@ -95,12 +103,20 @@ export default function SettingsPage({
         "Tüm geçmiş kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
       )
     ) {
-      const user = storage.getUser();
-      await historyService.deleteAll(user?.id);
-      localStorage.setItem("medical_inventory_history", JSON.stringify([])); // Clear local storage as well for safety
-      toast.success("Tüm geçmiş kayıtları temizlendi");
-      const info = await getStorageInfo();
-      setStorageInfo(info);
+      const toastId = toast.loading("Geçmiş kayıtları temizleniyor...");
+      try {
+        const user = storage.getUser();
+        await historyService.deleteAll(user?.id);
+        localStorage.setItem("medical_inventory_history", JSON.stringify([])); // Clear local storage as well for safety
+        toast.dismiss(toastId);
+        toast.success("Tüm geçmiş kayıtları temizlendi");
+        const info = await getStorageInfo();
+        setStorageInfo(info);
+      } catch (error: any) {
+        toast.dismiss(toastId);
+        console.error("Geçmiş temizleme hatası", error);
+        toast.error(error.message || "Geçmiş kayıtları temizlenemedi. Lütfen bağlantınızı kontrol edin.");
+      }
     }
   };
 
@@ -110,6 +126,7 @@ export default function SettingsPage({
         "Tüm verileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
       )
     ) {
+      const toastId = toast.loading("Sistem verileri temizleniyor...");
       try {
         const user = storage.getUser();
         // Clear everything from Backend Database
@@ -120,9 +137,11 @@ export default function SettingsPage({
         localStorage.clear();
         storage.clearUser();
 
+        toast.dismiss(toastId);
         toast.success("Tüm veriler veritabanından ve yerel depolamadan başarıyla silindi");
         onLogout();
-      } catch (error) {
+      } catch (error: any) {
+        toast.dismiss(toastId);
         console.error("Veri temizleme hatası", error);
         toast.error("Bazı veriler silinemedi. Lütfen bağlantıyı kontrol edin.");
       }
