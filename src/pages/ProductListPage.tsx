@@ -168,6 +168,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
     const getFieldValue = (product: Product, field: CustomField): any => {
         // Check default fields first
         switch (field.id) {
+            case 'quantity': return product.quantity !== undefined ? product.quantity : '';
             case 'serial_number': return product.serialNumber || '';
             case 'lot_number': return product.lotNumber || '';
             case 'expiry_date': return product.expiryDate || '';
@@ -378,16 +379,6 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                             <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === 'name' ? 'text-green-600' : 'text-slate-400'}`} />
                                         </div>
                                     </th>
-                                    <th
-                                        className={`px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-slate-100 transition-colors ${sortField === 'quantity' ? 'text-green-600' : 'text-slate-700'
-                                            }`}
-                                        onClick={() => handleSort('quantity')}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            Miktar
-                                            <ArrowUpDown className={`w-4 h-4 transition-colors ${sortField === 'quantity' ? 'text-green-600' : 'text-slate-400'}`} />
-                                        </div>
-                                    </th>
                                     {usedFields.map((field) => (
                                         <th
                                             key={field.id}
@@ -422,9 +413,6 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                         </td>
                                         <td className="px-4 py-3 text-sm font-medium text-slate-800">
                                             {product.name}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">
-                                            {product.quantity !== undefined ? product.quantity : '-'}
                                         </td>
                                         {usedFields.map((field) => (
                                             <td key={field.id} className="px-4 py-3 text-sm text-slate-600">

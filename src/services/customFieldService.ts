@@ -4,6 +4,7 @@ const STORAGE_KEY = 'custom_fields';
 
 // Default fields that cannot be deleted
 const DEFAULT_FIELDS: CustomField[] = [
+    { id: 'quantity', name: 'Miktar', dataType: 'number', isDefault: true, isActive: true },
     { id: 'serial_number', name: 'Seri No', dataType: 'text', isDefault: true, isActive: true },
     { id: 'lot_number', name: 'Lot No', dataType: 'text', isDefault: true, isActive: true },
     { id: 'expiry_date', name: 'SKT', dataType: 'date', isDefault: true, isActive: true },

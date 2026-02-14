@@ -1,16 +1,102 @@
 import * as XLSX from 'xlsx';
 import { FieldDataType } from '../types';
 
+export interface ExtractedCellData {
+    seri?: string;
+    lot?: string;
+    skt?: string;
+    ubb?: string;
+}
+
 export interface ExcelColumn {
     name: string;
     dataType: FieldDataType;
     samples: any[];
+    hasCombinedData?: boolean;
+    extractedSamples?: ExtractedCellData[];
 }
 
 export interface ParsedExcel {
     columns: ExcelColumn[];
     rows: any[][];
     headers: string[];
+}
+
+/**
+ * Regex patterns for extracting data from combined cells
+ */
+const EXTRACTION_PATTERNS = {
+    SERI: /(?:SERI|SERİ):\s*([^\\/\\\\]+)/i,
+    LOT: /LOT:\s*([^\\/\\\\]+)/i,
+    SKT: /SKT:\s*(\d{2}[\.\/]\d{2}[\.\/]\d{4})/i,
+    UBB: /UBB:\s*([^\\/\\\\]+)/i,
+};
+
+/**
+ * Extracts LOT, SKT, and UBB data from a combined cell value
+ * Example: "LOT:ABC123 / SKT:01.12.2025 / UBB:9876543210"
+ */
+export function extractCombinedCellData(cellValue: any): ExtractedCellData | null {
+    if (!cellValue || typeof cellValue !== 'string') return null;
+
+    const value = cellValue.toString().trim();
+    if (!value) return null;
+
+    const extracted: ExtractedCellData = {};
+    let hasAnyData = false;
+
+    // Extract SERI
+    const seriMatch = value.match(EXTRACTION_PATTERNS.SERI);
+    if (seriMatch) {
+        extracted.seri = seriMatch[1].trim();
+        hasAnyData = true;
+    }
+
+    // Extract LOT
+    const lotMatch = value.match(EXTRACTION_PATTERNS.LOT);
+    if (lotMatch) {
+        extracted.lot = lotMatch[1].trim();
+        hasAnyData = true;
+    }
+
+    // Extract SKT (Son Kullanma Tarihi)
+    const sktMatch = value.match(EXTRACTION_PATTERNS.SKT);
+    if (sktMatch) {
+        const dateStr = sktMatch[1];
+        const dateParts = dateStr.split(/[\.\/]/);
+        if (dateParts.length === 3) {
+            const day = dateParts[0].padStart(2, '0');
+            const month = dateParts[1].padStart(2, '0');
+            const year = dateParts[2];
+            extracted.skt = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
+            hasAnyData = true;
+        }
+    }
+
+    // Extract UBB
+    const ubbMatch = value.match(EXTRACTION_PATTERNS.UBB);
+    if (ubbMatch) {
+        extracted.ubb = ubbMatch[1].trim();
+        hasAnyData = true;
+    }
+
+    return hasAnyData ? extracted : null;
+}
+
+/**
+ * Checks if a cell contains combined data (multiple fields in one cell)
+ */
+export function hasCombinedData(cellValue: any): boolean {
+    if (!cellValue || typeof cellValue !== 'string') return false;
+
+    const value = cellValue.toString().trim();
+    const matchCount = [
+        EXTRACTION_PATTERNS.LOT.test(value),
+        EXTRACTION_PATTERNS.SKT.test(value),
+        EXTRACTION_PATTERNS.UBB.test(value),
+    ].filter(Boolean).length;
+
+    return matchCount >= 2; // At least 2 patterns found means combined data
 }
 
 /**
@@ -82,16 +168,26 @@ export async function parseExcelFile(file: File): Promise<ParsedExcel> {
                 const headers = jsonData[0] as string[];
                 const dataRows = jsonData.slice(1);
 
-                // Detect column types
+                // Detect column types and extract combined data
                 const columns: ExcelColumn[] = headers.map((header, index) => {
                     const columnValues = dataRows.map(row => row[index]);
                     const samples = columnValues.slice(0, 3); // First 3 samples
                     const dataType = detectDataType(columnValues);
 
+                    // Check if this column contains combined data
+                    const combinedDataDetected = columnValues.some(val => hasCombinedData(val));
+
+                    // Extract combined data from samples if present
+                    const extractedSamples = combinedDataDetected
+                        ? samples.map(sample => extractCombinedCellData(sample)).filter(Boolean) as ExtractedCellData[]
+                        : undefined;
+
                     return {
                         name: String(header || `Sütun ${index + 1}`),
                         dataType,
-                        samples
+                        samples,
+                        hasCombinedData: combinedDataDetected,
+                        extractedSamples
                     };
                 });
 
