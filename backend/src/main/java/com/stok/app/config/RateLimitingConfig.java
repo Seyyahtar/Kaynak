@@ -13,8 +13,9 @@ public class RateLimitingConfig {
 
     @Bean
     public Bucket bucket() {
-        // Defines the limit: 50 requests per minute
-        Bandwidth limit = Bandwidth.classic(50, Refill.greedy(50, Duration.ofMinutes(1)));
+        // Defines the limit: 500 requests per minute to accommodate bulk operations
+        // like Excel import
+        Bandwidth limit = Bandwidth.classic(500, Refill.greedy(500, Duration.ofMinutes(1)));
         return Bucket.builder()
                 .addLimit(limit)
                 .build();

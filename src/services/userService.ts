@@ -41,21 +41,7 @@ export const userService = {
         role: UserRole;
     }): Promise<User> {
         try {
-            const response = await fetch(`${API_BASE_URL}/users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(userData),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to create user');
-            }
-
-            return data.data;
+            return await api.post<User>('/users', userData);
         } catch (error) {
             console.error('Error creating user:', error);
             throw error;
@@ -67,21 +53,7 @@ export const userService = {
      */
     async updateUserRole(userId: string, role: UserRole): Promise<User> {
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${userId}/role`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ role }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to update user role');
-            }
-
-            return data.data;
+            return await api.put<User>(`/users/${userId}/role`, { role });
         } catch (error) {
             console.error('Error updating user role:', error);
             throw error;
@@ -93,15 +65,7 @@ export const userService = {
      */
     async deleteUser(userId: string): Promise<void> {
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-                method: 'DELETE',
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to delete user');
-            }
+            await api.delete<void>(`/users/${userId}`);
         } catch (error) {
             console.error('Error deleting user:', error);
             throw error;
@@ -113,19 +77,7 @@ export const userService = {
      */
     async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${userId}/password`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ oldPassword, newPassword }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to change password');
-            }
+            await api.put<void>(`/users/${userId}/password`, { oldPassword, newPassword });
         } catch (error) {
             console.error('Error changing password:', error);
             throw error;

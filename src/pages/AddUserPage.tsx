@@ -47,8 +47,8 @@ export default function AddUserPage({ onNavigate, currentUser }: AddUserPageProp
             return;
         }
 
-        if (formData.password.length < 4) {
-            toast.error('Şifre en az 4 karakter olmalıdır');
+        if (formData.password.length < 6) {
+            toast.error('Şifre en az 6 karakter olmalıdır');
             return;
         }
 
@@ -168,7 +168,7 @@ export default function AddUserPage({ onNavigate, currentUser }: AddUserPageProp
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-500">En az 4 karakter olmalıdır</p>
+                            <p className="text-xs text-slate-500">En az 6 karakter olmalıdır</p>
                         </div>
 
                         {/* Confirm Password */}

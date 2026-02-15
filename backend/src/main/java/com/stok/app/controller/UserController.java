@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +33,7 @@ public class UserController {
     /**
      * Get all users - Admin/Yönetici only
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'YONETICI')")
     @GetMapping
     public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers() {
         log.debug("Getting all users");
@@ -40,8 +42,9 @@ public class UserController {
     }
 
     /**
-     * Create new user - Admin/Yönetici only
+     * Create new user - Admin only
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ApiResponse<UserResponse>> createUser(
             @Valid @RequestBody CreateUserRequest request) {
@@ -55,6 +58,7 @@ public class UserController {
     /**
      * Update user role - Admin only
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/role")
     public ResponseEntity<ApiResponse<UserResponse>> updateUserRole(
             @PathVariable UUID id,
@@ -67,6 +71,7 @@ public class UserController {
     /**
      * Delete user - Admin only
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable UUID id) {
         log.debug("Deleting user: {}", id);
