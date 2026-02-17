@@ -25,6 +25,7 @@ public class CaseRecordResponse {
     private String doctorName;
     private String patientName;
     private String notes;
+    private String ownerName;
     private List<MaterialInfo> materials;
     private LocalDateTime createdAt;
 

@@ -51,8 +51,14 @@ public class StockService {
     }
 
     public List<StockItemResponse> getAllStock(UUID userId) {
-        log.debug("Getting all stock for user: {}", userId);
-        return stockItemRepository.findByUserId(userId).stream()
+        log.debug("Getting stock for user: {}", userId != null ? userId : "ALL USERS");
+        List<StockItem> items;
+        if (userId != null) {
+            items = stockItemRepository.findByUserId(userId);
+        } else {
+            items = stockItemRepository.findAll();
+        }
+        return items.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -548,6 +554,8 @@ public class StockService {
                 .fromField(item.getFromField())
                 .toField(item.getToField())
                 .materialCode(item.getMaterialCode())
+                .ownerName(item.getUser() != null ? item.getUser().getFullName() : "Unknown")
+                .ownerId(item.getUser() != null ? item.getUser().getId() : null)
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();

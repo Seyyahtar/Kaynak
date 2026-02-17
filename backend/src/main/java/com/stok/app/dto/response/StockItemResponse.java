@@ -42,6 +42,12 @@ public class StockItemResponse {
     @Schema(description = "Internal material code")
     private String materialCode;
 
+    @Schema(description = "Name of the user who owns this item")
+    private String ownerName;
+
+    @Schema(description = "ID of the user who owns this item")
+    private UUID ownerId;
+
     @Schema(description = "Creation timestamp")
     private LocalDateTime createdAt;
 
@@ -54,6 +60,7 @@ public class StockItemResponse {
 
     public StockItemResponse(UUID id, String materialName, String serialLotNumber, String ubbCode, LocalDate expiryDate,
             Integer quantity, LocalDate dateAdded, String fromField, String toField, String materialCode,
+            String ownerName, UUID ownerId,
             LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.materialName = materialName;
@@ -65,6 +72,8 @@ public class StockItemResponse {
         this.fromField = fromField;
         this.toField = toField;
         this.materialCode = materialCode;
+        this.ownerName = ownerName;
+        this.ownerId = ownerId;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -150,6 +159,22 @@ public class StockItemResponse {
         this.materialCode = materialCode;
     }
 
+    public String getOwnerName() {
+        return ownerName;
+    }
+
+    public void setOwnerName(String ownerName) {
+        this.ownerName = ownerName;
+    }
+
+    public UUID getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(UUID ownerId) {
+        this.ownerId = ownerId;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -182,6 +207,8 @@ public class StockItemResponse {
         private String fromField;
         private String toField;
         private String materialCode;
+        private String ownerName;
+        private UUID ownerId;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -235,6 +262,16 @@ public class StockItemResponse {
             return this;
         }
 
+        public StockItemResponseBuilder ownerName(String ownerName) {
+            this.ownerName = ownerName;
+            return this;
+        }
+
+        public StockItemResponseBuilder ownerId(UUID ownerId) {
+            this.ownerId = ownerId;
+            return this;
+        }
+
         public StockItemResponseBuilder createdAt(LocalDateTime createdAt) {
             this.createdAt = createdAt;
             return this;
@@ -247,7 +284,7 @@ public class StockItemResponse {
 
         public StockItemResponse build() {
             return new StockItemResponse(id, materialName, serialLotNumber, ubbCode, expiryDate, quantity, dateAdded,
-                    fromField, toField, materialCode, createdAt, updatedAt);
+                    fromField, toField, materialCode, ownerName, ownerId, createdAt, updatedAt);
         }
     }
 }

@@ -11,7 +11,9 @@ import { importFromExcel, exportToExcel, exportImplantList } from '@/utils/excel
 import DeviceGrouping from '@/components/DeviceGrouping';
 import { productService } from '@/services/productService';
 import { customFieldService } from '@/services/customFieldService';
-import { Product, CustomField } from '@/types';
+import { Product, CustomField, UserRole } from '@/types';
+import { UserFilter } from '@/components/UserFilter';
+import { userService } from '@/services/userService';
 
 import {
   Sheet,
@@ -40,6 +42,7 @@ interface MaterialGroup {
   fullName: string;
   totalQuantity: number;
   items: StockItem[];
+  colorClass?: string;
 }
 
 interface PrefixGroup {
@@ -77,6 +80,12 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const [implantTemplateData, setImplantTemplateData] = useState<ArrayBuffer | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set()); // For selection mode
 
+  // User Filter State
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [userColors, setUserColors] = useState<Map<string, string>>(new Map());
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>();
+  const [usersMap, setUsersMap] = useState<Map<string, string>>(new Map()); // id -> fullName for coloring lookup
+
   // Dynamic Data State
   const [products, setProducts] = useState<Product[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -90,6 +99,8 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     { id: 'from', label: 'Kimden' },
     { id: 'to', label: 'Kime' },
     { id: 'materialCode', label: 'Malzeme Kodu' },
+    // Owner name should be visible for admin/privileged roles
+    { id: 'ownerName', label: 'Sahip' },
     { id: 'dateAdded', label: 'Eklenme Tarihi' },
   ];
 
@@ -103,6 +114,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   ];
 
   // Column Visibility State
+  // Initialize with all columns visible by default
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(dynamicColumns.map(c => c.id)));
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
 
@@ -110,7 +122,24 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     loadStock();
     loadVisibilitySettings();
     loadDynamicData();
+    loadCurrentUserRole();
+    loadUsers();
   }, []);
+
+  const loadCurrentUserRole = () => {
+    setCurrentUserRole(storage.getUser()?.role);
+  };
+
+  const loadUsers = async () => {
+    try {
+      const users = await userService.getAllUsers();
+      const map = new Map<string, string>();
+      users.forEach(u => map.set(u.fullName, u.id));
+      setUsersMap(map);
+    } catch (e) {
+      console.error("Failed to load users for mapping", e);
+    }
+  }
 
   const loadDynamicData = () => {
     setProducts(productService.getProducts());
@@ -256,6 +285,19 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
       item.ubbCode.toLowerCase().includes(search);
   };
 
+  const filterStockByUser = (item: StockItem): boolean => {
+    if (selectedUserIds.size === 0) return true;
+    // item.ownerName serves as the identifier in the UI for now, but filtering usually works best with IDs.
+    // However, our backend DTO sends ownerName.
+    // If we want exact filtering, we might need to map ownerName back to ID or filter by ownerName directly if UserFilter returned names.
+    // But UserFilter returns IDs.
+    // Let's use the usersMap to find the ID for the item.ownerName
+
+    if (!item.ownerName) return false; // Should not happen for admin view if backend works
+    const ownerId = usersMap.get(item.ownerName);
+    return ownerId ? selectedUserIds.has(ownerId) : false;
+  };
+
   const toggleItemSelection = (item: StockItem) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(item.id)) {
@@ -395,7 +437,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   // Filtrelenmis stok sayisini hesapla
   const filteredStockData = React.useMemo(() => {
     return stock.filter(item => {
-      return filterStockByCategory(item) && filterStockBySearch(item);
+      return filterStockByCategory(item) && filterStockBySearch(item) && filterStockByUser(item);
     });
   }, [stock, activeFilters, searchText]);
 
@@ -426,6 +468,11 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
       }
       materialGroups[item.materialName].totalQuantity += item.quantity;
       materialGroups[item.materialName].items.push(item);
+
+      // Assign color to the group if all items belong to same user (or mixed?)
+      // Since grouping is by material name, it can contain items from multiple users.
+      // But usually we display individual lines in the accordion.
+      // We will handle coloring at the row level in the render.
     });
 
     // Sonra prefix'e göre grupla (ilk kelimeye göre)
@@ -590,7 +637,14 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
           {/* ... Only show normal header in view mode ... */}
           <div className="flex items-center justify-between">
             <Button variant="ghost" size="icon" onClick={() => onNavigate('home')}><ArrowLeft className="w-5 h-5" /></Button>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <UserFilter
+                selectedUserIds={selectedUserIds}
+                onSelectionChange={setSelectedUserIds}
+                userColors={userColors}
+                onColorMapChange={setUserColors}
+                currentUserRole={currentUserRole}
+              />
               <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)}><Menu className="w-5 h-5" /></Button>
               <Button variant="ghost" size="icon" onClick={() => setFilterOpen(!filterOpen)} className={activeFilters.size > 0 || searchText ? 'text-blue-600' : ''}><Filter className="w-5 h-5" /></Button>
             </div>
@@ -979,28 +1033,66 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                               )}
                                             </td>
                                           )}
-                                          {visibleColumns.has('quantity') && (
-                                            <td className="p-2 border-r text-slate-600">
-                                              {isEditing ? (
-                                                <Input
-                                                  type="number"
-                                                  value={editingValues.quantity || ''}
-                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
-                                                    ...editingValues,
-                                                    quantity: parseInt(e.target.value)
-                                                  })}
-                                                  className="h-8"
-                                                  min="1"
-                                                />
+                                          {dynamicColumns.filter(col => visibleColumns.has(col.id)).map(column => (
+                                            <td key={column.id} className="p-2 border-r text-slate-600">
+                                              {isEditing && ['serialLotNumber', 'ubbCode', 'expiryDate', 'quantity'].includes(column.id) ? (
+                                                column.id === 'serialLotNumber' ? (
+                                                  <Input
+                                                    value={editingValues.serialLotNumber || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                      ...editingValues,
+                                                      serialLotNumber: e.target.value
+                                                    })}
+                                                    className="h-8"
+                                                  />
+                                                ) : column.id === 'ubbCode' ? (
+                                                  <Input
+                                                    value={editingValues.ubbCode || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                      ...editingValues,
+                                                      ubbCode: e.target.value
+                                                    })}
+                                                    className="h-8"
+                                                  />
+                                                ) : column.id === 'expiryDate' ? (
+                                                  <Input
+                                                    type="date"
+                                                    value={editingValues.expiryDate || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                      ...editingValues,
+                                                      expiryDate: e.target.value
+                                                    })}
+                                                    className="h-8"
+                                                  />
+                                                ) : column.id === 'quantity' ? (
+                                                  <Input
+                                                    type="number"
+                                                    value={editingValues.quantity || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
+                                                      ...editingValues,
+                                                      quantity: parseInt(e.target.value)
+                                                    })}
+                                                    className="h-8"
+                                                    min="1"
+                                                  />
+                                                ) : null
                                               ) : (
-                                                item.quantity
+                                                column.id === 'expiryDate' ? (
+                                                  item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('tr-TR') : '-'
+                                                ) : column.id === 'quantity' ? (
+                                                  <span className={item.quantity <= 5 ? 'text-red-600 font-bold' : ''}>
+                                                    {item.quantity}
+                                                  </span>
+                                                ) : column.id === 'ownerName' ? (
+                                                  (item as any).ownerName || '-'
+                                                ) : column.id === 'dateAdded' ? (
+                                                  item.dateAdded ? new Date(item.dateAdded).toLocaleDateString('tr-TR') : '-'
+                                                ) : (
+                                                  (item as any)[column.id] || '-'
+                                                )
                                               )}
                                             </td>
-                                          )}
-                                          {visibleColumns.has('from') && <td className="p-2 border-r text-slate-600">{item.from || '-'}</td>}
-                                          {visibleColumns.has('to') && <td className="p-2 border-r text-slate-600">{item.to || '-'}</td>}
-                                          {visibleColumns.has('materialCode') && <td className="p-2 border-r text-slate-600">{item.materialCode || '-'}</td>}
-                                          {visibleColumns.has('dateAdded') && <td className="p-2 border-r text-slate-600">{item.dateAdded ? new Date(item.dateAdded).toLocaleDateString('tr-TR') : '-'}</td>}
+                                          ))}
 
                                           {/* Dynamic Custom Fields from Product */}
                                           {customFields

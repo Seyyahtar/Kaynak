@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Page } from "@/types";
 import { storage } from "@/utils/storage";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { stockService } from "@/services/stockService";
 import { historyService } from "@/services/historyService";
 import { userService } from "@/services/userService";
@@ -491,13 +491,34 @@ export default function SettingsPage({
           </div>
         </Card>
 
-        {/* Uygulama Bilgisi - Moved to bottom */}
+        {/* Uygulama Bilgisi ve Güncelleme */}
         <Card className="p-6">
-          <div className="flex items-center gap-3 justify-center">
-            <Info className="w-4 h-4 text-slate-400" />
-            <p className="text-slate-500 text-sm">
-              Yazılım Versiyonu: <strong>3.7</strong>
-            </p>
+          <div className="flex flex-col items-center gap-3 justify-center">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-slate-400" />
+              <p className="text-slate-500 text-sm">
+                Yazılım Versiyonu: <strong>3.6</strong>
+              </p>
+            </div>
+
+            {/* Bu kısım dinamik olacak */}
+            {localStorage.getItem('latest_version') && localStorage.getItem('latest_version')! > "3.6" && (
+              <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-blue-700 font-medium text-sm">Yeni Sürüm Mevcut! ({localStorage.getItem('latest_version')})</span>
+                </div>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => {
+                    // APK indirme linki veya işlemi buraya gelecek
+                    alert(`Sürüm ${localStorage.getItem('latest_version')} indiriliyor...\n(Bu özellik şu an demo aşamasındadır)`);
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Güncelle
+                </Button>
+              </div>
+            )}
           </div>
         </Card>
       </div>

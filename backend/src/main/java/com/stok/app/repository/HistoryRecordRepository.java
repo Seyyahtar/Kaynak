@@ -18,6 +18,8 @@ public interface HistoryRecordRepository extends JpaRepository<HistoryRecord, UU
 
     List<HistoryRecord> findByUserIdOrderByRecordDateDesc(UUID userId);
 
+    List<HistoryRecord> findAllByOrderByRecordDateDesc();
+
     List<HistoryRecord> findByTypeAndUserId(String type, UUID userId);
 
     List<HistoryRecord> findByRecordDateBetweenAndUserId(

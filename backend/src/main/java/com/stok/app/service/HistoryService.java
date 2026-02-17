@@ -34,8 +34,14 @@ public class HistoryService {
     private final CaseRecordRepository caseRecordRepository;
 
     public List<HistoryRecordResponse> getAllHistory(UUID userId) {
-        log.debug("Getting all history for user: {}", userId);
-        return historyRecordRepository.findByUserIdOrderByRecordDateDesc(userId).stream()
+        log.debug("Getting history for user: {}", userId != null ? userId : "ALL USERS");
+        List<HistoryRecord> records;
+        if (userId != null) {
+            records = historyRecordRepository.findByUserIdOrderByRecordDateDesc(userId);
+        } else {
+            records = historyRecordRepository.findAllByOrderByRecordDateDesc();
+        }
+        return records.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -126,6 +132,8 @@ public class HistoryService {
                 .recordDate(record.getRecordDate())
                 .type(record.getType())
                 .description(record.getDescription())
+                .ownerName(record.getUser() != null ? record.getUser().getFullName() : "Unknown")
+                .ownerId(record.getUser() != null ? record.getUser().getId() : null)
                 .details(record.getDetailsJson())
                 .createdAt(record.getCreatedAt())
                 .build();

@@ -21,12 +21,42 @@ import java.util.UUID;
 public class HistoryController {
 
     private final HistoryService historyService;
-    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private final com.stok.app.repository.UserRepository userRepository; // Inject UserRepository
+
+    private UUID getEffectiveUserId(UUID userId) {
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalArgumentException("User not authenticated");
+        }
+
+        String username = authentication.getName();
+        com.stok.app.entity.User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        boolean isPrivileged = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                        a.getAuthority().equals("ROLE_YONETICI") ||
+                        a.getAuthority().equals("ROLE_DEPO"));
+
+        if (isPrivileged) {
+            if (userId != null)
+                return userId;
+            return null; // Return null to fetch ALL data
+        }
+
+        // Regular user: Must use their own ID
+        if (userId != null && !userId.equals(currentUser.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("You can only access your own data");
+        }
+        return currentUser.getId();
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<HistoryRecordResponse>>> getAllHistory(
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        UUID effectiveUserId = getEffectiveUserId(userId);
         List<HistoryRecordResponse> history = historyService.getAllHistory(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(history));
     }
@@ -35,7 +65,7 @@ public class HistoryController {
     public ResponseEntity<ApiResponse<Void>> deleteHistory(
             @PathVariable UUID id,
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        UUID effectiveUserId = getEffectiveUserId(userId);
         historyService.deleteHistory(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("History record deleted successfully", null));
     }
@@ -43,7 +73,7 @@ public class HistoryController {
     @DeleteMapping("/all")
     public ResponseEntity<ApiResponse<Void>> deleteAllHistory(
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = userId != null ? userId : TEST_USER_ID;
+        UUID effectiveUserId = getEffectiveUserId(userId);
         historyService.deleteAllHistory(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("All history records deleted successfully", null));
     }

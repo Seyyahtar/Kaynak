@@ -16,6 +16,10 @@ import { Capacitor } from '@capacitor/core';
 import shareIcon from '@/assets/icons/share-2.svg';
 import downloadIcon from '@/assets/icons/download.svg';
 import { exportHistoryToExcel, shareHistoryToExcel } from '@/utils/excelUtils';
+import { UserFilter } from '@/components/UserFilter';
+import { UserRole } from '@/types';
+import { historyService } from '@/services/historyService';
+import { userService } from '@/services/userService';
 
 interface HistoryPageProps {
   onNavigate: (page: Page) => void;
@@ -33,13 +37,64 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     endDate: '',
   });
 
+  // User Filter State
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [userColors, setUserColors] = useState<Map<string, string>>(new Map());
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>();
+  const [usersMap, setUsersMap] = useState<Map<string, string>>(new Map());
+
   useEffect(() => {
     loadHistory();
+    loadCurrentUserRole();
+    loadUsers();
   }, []);
 
-  const loadHistory = async () => {
-    const data = await storage.getHistory();
-    setHistory(data);
+  const loadCurrentUserRole = () => {
+    const user = storage.getUser();
+    setCurrentUserRole(user?.role);
+  };
+
+  const loadUsers = async () => {
+    try {
+      const users = await userService.getAllUsers();
+      const map = new Map<string, string>();
+      users.forEach(u => {
+        if (u.fullName) map.set(u.fullName, u.id);
+        if (u.username) map.set(u.username, u.id);
+      });
+      setUsersMap(map);
+    } catch (e) {
+      console.error("Failed to load users for mapping", e);
+    }
+  }
+
+  // Effect to reload history when user selection changes
+  useEffect(() => {
+    loadHistory(selectedUserIds);
+  }, [selectedUserIds]);
+
+  const loadHistory = async (userIds?: Set<string>) => {
+    try {
+      // setLoading(true); // History page might not have loading state exposed yet, add if needed
+      let data: HistoryRecord[] = [];
+
+      if (userIds && userIds.size > 0) {
+        // Fetch specific users' history on demand
+        const promises = Array.from(userIds).map(id => historyService.getAll(id));
+        const results = await Promise.all(promises);
+        data = results.flat();
+      } else {
+        // Default: Load current user's history
+        data = await storage.getHistory();
+      }
+
+      setHistory(data);
+    } catch (error) {
+      console.error("Geçmiş yüklenirken hata:", error);
+      toast.error("Geçmiş verileri yüklenemedi");
+    } finally {
+      // setLoading(false); 
+    }
   };
 
   const handleDownloadHistory = async () => {
@@ -331,9 +386,30 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
         return false;
       }
 
+      if (filters.endDate && record.date > filters.endDate) {
+        return false;
+      }
+
+      // User Filter
+      if (selectedUserIds.size > 0) {
+        // Use ownerId if available (robust)
+        if (record.ownerId) {
+          if (!selectedUserIds.has(record.ownerId)) {
+            return false;
+          }
+        } else {
+          // Fallback to name mapping
+          if (!record.ownerName) return false;
+          const ownerId = usersMap.get(record.ownerName);
+          if (!ownerId || !selectedUserIds.has(ownerId)) {
+            return false;
+          }
+        }
+      }
+
       return true;
     });
-  }, [history, filters]);
+  }, [history, filters, selectedUserIds, usersMap]);
 
   const getTypeLabel = (type: HistoryRecord['type']) => {
     switch (type) {
@@ -653,33 +729,40 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-purple-600 text-white p-4 sticky top-0 z-20">
-        <div className="flex items-center gap-3">
+      <div className="bg-white border-b p-4 sticky top-0 z-20">
+        <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => onNavigate('home')}
-            className="text-white hover:bg-purple-700"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-white flex-1">Geçmiş</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white hover:bg-purple-700"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setFilterOpen(!filterOpen)}
-            className="text-white hover:bg-purple-700"
-          >
-            <Filter className="w-5 h-5" />
-          </Button>
+          <div className="flex gap-2 items-center">
+            <div className="ml-2">
+              <UserFilter
+                selectedUserIds={selectedUserIds}
+                onSelectionChange={setSelectedUserIds}
+                userColors={userColors}
+                onColorMapChange={setUserColors}
+                currentUserRole={currentUserRole}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFilterOpen(!filterOpen)}
+            >
+              <Filter className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -800,6 +883,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
                       </span>
                     </div>
                     <p className="text-slate-700">{record.description}</p>
+                    {record.ownerName && <p className="text-slate-600 text-sm">Kullanıcı: <span className="text-slate-800">{record.ownerName}</span></p>}
                   </div>
                   <div className="flex gap-1">
                     <Button

@@ -1,7 +1,7 @@
-﻿// Excel işlemleri için yardımcı fonksiyonlar
-import * as XLSX from "xlsx";
-import { StockItem, ChecklistPatient, CaseRecord, HistoryRecord, ChecklistRecord } from "../types";
+﻿import * as XLSX from "xlsx";
+import { StockItem, ChecklistPatient, CaseRecord, HistoryRecord, ChecklistRecord, Product, CustomField } from "../types";
 import { Filesystem, Directory } from '@capacitor/filesystem';
+
 import { Share } from '@capacitor/share';
 import { Capacitor } from "@capacitor/core";
 import { FilePicker } from '@capawesome/capacitor-file-picker';
@@ -711,5 +711,109 @@ export const shareHistoryToExcel = async (
 
   } catch (error) {
     throw new Error("Excel paylaşma hatası: " + (error as Error).message);
+  }
+};
+
+export const exportProductsToExcel = async (
+  products: Product[],
+  fields: CustomField[],
+  filename: string = "urun_listesi.xlsx"
+) => {
+  try {
+    // 1. Prepare Headers (Dynamic)
+    const headers: string[] = ["Sıra No", "Ürün Adı"];
+    const fieldMap = new Map<string, string>(); // Header Name -> Field ID
+
+    // Add visible active fields
+    fields.forEach(f => {
+      if (f.isActive) {
+        headers.push(f.name);
+        fieldMap.set(f.name, f.id);
+      }
+    });
+
+    // 2. Map Data
+    const excelData = products.map((product, index) => {
+      const row: any = {
+        "Sıra No": index + 1,
+        "Ürün Adı": product.name,
+      };
+
+      // Fill dynamic fields
+      fields.forEach(f => {
+        if (f.isActive) {
+          let value = '';
+          // Check standard fields first
+          switch (f.id) {
+            case 'quantity': value = product.quantity !== undefined ? product.quantity.toString() : ''; break;
+            case 'serial_number': value = product.serialNumber || ''; break;
+            case 'lot_number': value = product.lotNumber || ''; break;
+            case 'expiry_date': value = product.expiryDate || ''; break;
+            case 'ubb_code': value = product.ubbCode || ''; break;
+            case 'product_code': value = product.productCode || ''; break;
+            default:
+              // Custom fields
+              value = product.customFields[f.id] || '';
+          }
+          row[f.name] = value;
+        }
+      });
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData, { header: headers });
+
+    // Auto-width for columns (rough estimate)
+    const colWidths = headers.map(h => ({ wch: Math.max(h.length + 5, 15) }));
+    colWidths[1] = { wch: 40 }; // Ürün Adı wider
+    worksheet["!cols"] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürün Listesi");
+
+    // 3. Save/Share
+    if (Capacitor.getPlatform() === "web") {
+      XLSX.writeFile(workbook, filename);
+      return;
+    }
+
+    if (Capacitor.getPlatform() !== "web") {
+      const base64 = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "base64",
+      });
+
+      // Cache
+      const tempFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      // Share
+      const fileUri = tempFile.uri;
+      await Share.share({
+        title: "Ürün Listesi",
+        text: "Ürün listesi ektedir.",
+        files: [fileUri],
+      });
+
+      // Backup to Download
+      try {
+        const downloadPath = `Download/${filename}`;
+        await Filesystem.writeFile({
+          path: downloadPath,
+          data: base64,
+          directory: Directory.ExternalStorage,
+        });
+      } catch (e) {
+        console.warn("Yedekleme hatası (önemsiz):", e);
+      }
+    }
+
+  } catch (error) {
+    console.error("Ürün listesi export hatası:", error);
+    throw new Error("Excel dosyası oluşturulurken hata: " + (error as Error).message);
   }
 };

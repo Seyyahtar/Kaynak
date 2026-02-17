@@ -35,8 +35,14 @@ public class CaseService {
     private final StockService stockService;
 
     public List<CaseRecordResponse> getAllCases(UUID userId) {
-        log.debug("Getting all cases for user: {}", userId);
-        return caseRecordRepository.findByUserIdOrderByCaseDateDesc(userId).stream()
+        log.debug("Getting cases for user: {}", userId != null ? userId : "ALL USERS");
+        List<CaseRecord> cases;
+        if (userId != null) {
+            cases = caseRecordRepository.findByUserIdOrderByCaseDateDesc(userId);
+        } else {
+            cases = caseRecordRepository.findAllByOrderByCaseDateDesc();
+        }
+        return cases.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -115,7 +121,9 @@ public class CaseService {
                 .hospitalName(caseRecord.getHospitalName())
                 .doctorName(caseRecord.getDoctorName())
                 .patientName(caseRecord.getPatientName())
+                .patientName(caseRecord.getPatientName())
                 .notes(caseRecord.getNotes())
+                .ownerName(caseRecord.getUser() != null ? caseRecord.getUser().getFullName() : "Unknown")
                 .materials(caseRecord.getMaterials().stream()
                         .map(m -> CaseRecordResponse.MaterialInfo.builder()
                                 .id(m.getId())

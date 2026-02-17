@@ -8,6 +8,7 @@ import { productService } from '../services/productService';
 import { customFieldService } from '../services/customFieldService';
 import { toast } from 'sonner';
 import { parseExcelFile, validateExcelFile } from '../utils/excelParser';
+import { exportProductsToExcel } from '../utils/excelUtils';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -249,6 +250,21 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         return 0;
     });
 
+    // Export Handler
+    const handleExport = async () => {
+        if (products.length === 0) {
+            toast.error('Dışa aktarılacak ürün bulunamadı');
+            return;
+        }
+
+        try {
+            await exportProductsToExcel(products, fields);
+            toast.success('Excel dosyası oluşturuldu');
+        } catch (error: any) {
+            toast.error(error.message);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
@@ -297,34 +313,42 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                     </Button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <Button
                         onClick={() => onNavigate('custom-fields')}
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-w-[140px]"
                     >
                         <Settings className="w-4 h-4 mr-2" />
                         Başlık Yönetimi
                     </Button>
                     <Button
+                        onClick={handleExport}
+                        variant="outline"
+                        className="flex-1 min-w-[140px]"
+                    >
+                        <Upload className="w-4 h-4 mr-2 rotate-180" /> {/* Rotate for download effect or use Download icon */}
+                        Excel'e Aktar
+                    </Button>
+                    <Button
                         onClick={() => handleExcelImport('list')}
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-w-[140px]"
                     >
                         <Upload className="w-4 h-4 mr-2" />
-                        Excel İle Liste İçeri Aktar
+                        Liste İçe Aktar
                     </Button>
                     <Button
                         onClick={() => handleExcelImport('update')}
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-w-[140px]"
                     >
                         <Upload className="w-4 h-4 mr-2" />
-                        Excel İle Veri Aktar
+                        Veri İçe Aktar
                     </Button>
                     <Button
                         onClick={handleNewProduct}
-                        className="flex-1"
+                        className="flex-1 min-w-[140px]"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         Yeni Ürün

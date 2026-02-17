@@ -22,6 +22,8 @@ public class HistoryRecordResponse {
     private LocalDateTime recordDate;
     private String type;
     private String description;
+    private String ownerName;
+    private UUID ownerId;
     private Map<String, Object> details;
     private LocalDateTime createdAt;
 }

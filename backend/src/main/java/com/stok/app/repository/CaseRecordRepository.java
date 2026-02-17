@@ -18,6 +18,8 @@ public interface CaseRecordRepository extends JpaRepository<CaseRecord, UUID> {
 
     List<CaseRecord> findByUserIdOrderByCaseDateDesc(UUID userId);
 
+    List<CaseRecord> findAllByOrderByCaseDateDesc();
+
     List<CaseRecord> findByCaseDateBetweenAndUserId(LocalDate startDate, LocalDate endDate, UUID userId);
 
     List<CaseRecord> findByHospitalNameContainingIgnoreCaseAndUserId(String hospitalName, UUID userId);

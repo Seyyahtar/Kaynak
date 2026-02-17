@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: stok-yonetim-backend
+  
+  # App Version for Client Checks
+  app:
+    version: 3.7
 
   # Database Configuration
   datasource:

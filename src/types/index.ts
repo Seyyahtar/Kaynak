@@ -11,6 +11,8 @@ export interface StockItem {
   from?: string; // Kimden
   to?: string; // Kime
   materialCode?: string; // Malzeme Kodu (Excel'den gelen)
+  ownerName?: string; // Verinin sahibi (Admin görünümü için)
+  ownerId?: string; // Verinin sahibinin ID'si
 }
 
 export interface CaseRecord {
@@ -20,6 +22,7 @@ export interface CaseRecord {
   doctorName: string;
   patientName: string;
   notes?: string;
+  ownerName?: string;
   materials: {
     materialName: string;
     serialLotNumber: string;
@@ -55,6 +58,8 @@ export interface HistoryRecord {
   type: 'stock-add' | 'stock-remove' | 'case' | 'stock-delete' | 'checklist';
   description: string;
   details: any;
+  ownerName?: string;
+  ownerId?: string;
   userId?: string;
 }
 

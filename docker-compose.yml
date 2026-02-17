@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stok-yonetim-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/stok_yonetim
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - db
+    networks:
+      - stok-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: stok-yonetim-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=stok_yonetim
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - stok-network
+
+networks:
+  stok-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

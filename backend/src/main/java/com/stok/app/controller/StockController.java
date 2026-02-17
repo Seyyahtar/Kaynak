@@ -31,10 +31,39 @@ public class StockController {
     private final com.stok.app.repository.UserRepository userRepository; // Inject UserRepository
 
     private UUID getEffectiveUserId(UUID userId) {
-        if (userId != null) {
-            return userId;
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalArgumentException("User not authenticated");
         }
-        throw new IllegalArgumentException("User ID is required for isolation. Please provide userId.");
+
+        String username = authentication.getName();
+        com.stok.app.entity.User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        boolean isPrivileged = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                        a.getAuthority().equals("ROLE_YONETICI") ||
+                        a.getAuthority().equals("ROLE_DEPO"));
+
+        // If user is privileged
+        if (isPrivileged) {
+            // If they requested a specific userId, use it
+            if (userId != null) {
+                return userId;
+            }
+            // If they didn't request a userId, return null (meaning "ALL USERS")
+            return null;
+        }
+
+        // If user is NOT privileged (Regular User)
+        // They can ONLY see their own data
+        if (userId != null && !userId.equals(currentUser.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("You can only access your own data");
+        }
+
+        return currentUser.getId();
     }
 
     @GetMapping

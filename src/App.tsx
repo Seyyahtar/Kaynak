@@ -19,6 +19,7 @@ import ExcelImportPage from './pages/ExcelImportPage';
 import { Page, StockItem } from './types';
 import { storage } from './utils/storage';
 import { App as CapacitorApp } from '@capacitor/app';
+import { APP_CONFIG } from './config';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -77,6 +78,38 @@ export default function App() {
 
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  // Version Check Effect
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+          const data = await response.json();
+          const serverVersion = data.version; // e.g., "3.7"
+          const appVersion = APP_CONFIG.VERSION;
+
+          if (serverVersion && serverVersion > appVersion) {
+            toast.info(`Yeni sürüm mevcut: ${serverVersion}`, {
+              action: {
+                label: 'Güncelle',
+                onClick: () => setCurrentPage('settings')
+              },
+              duration: 10000, // Show for 10 seconds
+            });
+            // You might want to store this in state or context if you want the "Update" badge in Settings to persist
+            localStorage.setItem('latest_version', serverVersion);
+          }
+        }
+      } catch (error) {
+        console.error("Version check failed", error);
+      }
+    };
+
+    // Check after a small delay to let app load
+    const timer = setTimeout(checkVersion, 3000);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleLogin = (username: string) => {

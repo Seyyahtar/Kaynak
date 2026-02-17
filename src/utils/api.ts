@@ -1,16 +1,18 @@
-const API_BASE_URL = '/api';
+import { APP_CONFIG } from '../config';
 
 export const api = {
     async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const url = `${API_BASE_URL}${endpoint}`;
+        // Use dynamic base URL from config
+        const url = `${APP_CONFIG.API_BASE_URL}${endpoint}`;
+
         // Get token from storage
-        // Circular dependency risk avoided by direct localStorage access or strictly typed storage import
-        // Using direct localStorage to be safe against circular deps with storage.ts if it imports api.ts
         const token = localStorage.getItem('token');
 
         const defaultOptions: RequestInit = {
             headers: {
                 'Content-Type': 'application/json',
+                // Header to bypass ngrok browser warning page
+                'ngrok-skip-browser-warning': 'true',
                 ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                 ...options.headers,
             },
