@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, Settings, Pencil, Trash2, ArrowUpDown, Upload, Package, CheckSquare, X } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, Pencil, Trash2, ArrowUpDown, Upload, Package, CheckSquare, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
@@ -568,30 +568,29 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
             {isMultiDeleteMode && (
                 <>
                     {/* Left: Cancel Selection */}
-                    <div className="fixed bottom-6 left-6 z-50 animate-in slide-in-from-bottom-4">
+                    <div className="fixed bottom-4 left-4 z-50">
                         <Button
+                            variant="destructive"
+                            size="icon"
                             onClick={() => {
                                 setIsMultiDeleteMode(false);
                                 setSelectedProducts(new Set());
                             }}
-                            variant="outline"
-                            className="bg-white shadow-lg h-12 px-6 rounded-full border-slate-200 text-slate-700 hover:bg-slate-50"
+                            className="rounded-full w-14 h-14 shadow-xl hover:scale-105 transition-transform border-4 border-white"
                         >
-                            <X className="w-5 h-5 mr-2" />
-                            İptal Et
+                            <X className="w-8 h-8" />
                         </Button>
                     </div>
 
                     {/* Right: Delete Selected */}
                     {selectedProducts.size > 0 && (
-                        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
+                        <div className="fixed bottom-4 right-4 z-50">
                             <Button
                                 onClick={() => setShowDeleteSelectedDialog(true)}
-                                className="bg-red-600 hover:bg-red-700 text-white shadow-lg h-12 px-6 rounded-full"
-                                style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                                className="bg-green-600 hover:bg-green-700 rounded-full w-14 h-14 shadow-xl hover:scale-105 transition-transform flex items-center justify-center border-4 border-white"
+                                style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
                             >
-                                <Trash2 className="w-5 h-5 mr-2" />
-                                Seçilenleri Sil ({selectedProducts.size})
+                                <Check className="w-8 h-8 text-white" />
                             </Button>
                         </div>
                     )}

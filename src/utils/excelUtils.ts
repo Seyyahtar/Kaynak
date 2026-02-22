@@ -64,13 +64,40 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
           return isNaN(num) ? 0 : num;
         };
 
-        // Excel tarih formatından normal tarihe çevir (1900-01-01 = 1)
+        // Excel tarih formatından veya string formatından normal tarihe çevir
         const excelDateToJSDate = (excelDate: any) => {
           if (!excelDate) return "";
-          const num = parseInt(excelDate.toString(), 10);
-          if (isNaN(num) || num < 1) return "";
-          const date = new Date((num - 1) * 24 * 60 * 60 * 1000 + new Date(1900, 0, 1).getTime());
-          return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+          const dateStr = excelDate.toString().trim();
+          if (!dateStr || dateStr === "-") return "";
+
+          // Eğer zaten GG.AA.YYYY veya YYYY-AA-GG formatındaysa
+          const parts = dateStr.split(/[./-]/);
+          if (parts.length === 3) {
+            let day, month, year;
+            if (parts[0].length === 4) { // YYYY-MM-DD
+              [year, month, day] = parts;
+            } else if (parts[2].length === 4) { // DD.MM.YYYY
+              [day, month, year] = parts;
+            } else if (parts[0].length === 2 && parts[2].length === 2) { // DD.MM.YY
+              [day, month, year] = parts;
+              year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+            }
+
+            if (day && month && year) {
+              return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+            }
+          }
+
+          // Sayısal Excel formatı kontrolü
+          const num = parseInt(dateStr, 10);
+          // Gerçekçi bir ürün tarihi (2000 sonrası) > 36000 olmalı.
+          // Küçük sayılar (örn: 30) muhtemelen yanlış parse edilmiş GG.AA.YYYY verisidir.
+          if (isNaN(num) || num < 1000) return "";
+
+          // Excel'in 1900 leap year bug düzeltmesi
+          const adjustedNum = num > 59 ? num - 1 : num;
+          const date = new Date((adjustedNum - 1) * 24 * 60 * 60 * 1000 + Date.UTC(1900, 0, 1));
+          return date.toISOString().split("T")[0];
         };
 
         // İlk satır başlık olduğu için 1'den başla

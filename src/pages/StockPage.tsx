@@ -14,6 +14,7 @@ import { customFieldService } from '@/services/customFieldService';
 import { Product, CustomField, UserRole } from '@/types';
 import { UserFilter } from '@/components/UserFilter';
 import { userService } from '@/services/userService';
+import { stockService } from '@/services/stockService';
 
 import {
   Sheet,
@@ -119,12 +120,15 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
 
   useEffect(() => {
-    loadStock();
     loadVisibilitySettings();
     loadDynamicData();
     loadCurrentUserRole();
     loadUsers();
   }, []);
+
+  useEffect(() => {
+    loadStock(selectedUserIds);
+  }, [selectedUserIds]);
 
   const loadCurrentUserRole = () => {
     setCurrentUserRole(storage.getUser()?.role);
@@ -205,9 +209,25 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     loadDefaultTemplate();
   }, [implantTemplateData]);
 
-  const loadStock = async () => {
-    const stockData = await storage.getStock();
-    setStock(stockData);
+  const loadStock = async (userIds?: Set<string>) => {
+    try {
+      let data: StockItem[] = [];
+
+      if (userIds && userIds.size > 0) {
+        // Seçili kullanıcıların stok verilerini getir
+        const promises = Array.from(userIds).map(id => stockService.getAll(id));
+        const results = await Promise.all(promises);
+        data = results.flat();
+      } else {
+        // Varsayılan: Mevcut kullanıcının stok verilerini storage'dan getir
+        data = await storage.getStock();
+      }
+
+      setStock(data);
+    } catch (error) {
+      console.error("Stok yüklenirken hata:", error);
+      toast.error("Stok verileri yüklenemedi");
+    }
   };
 
   const toggleFilter = (filterName: string) => {
@@ -439,7 +459,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     return stock.filter(item => {
       return filterStockByCategory(item) && filterStockBySearch(item) && filterStockByUser(item);
     });
-  }, [stock, activeFilters, searchText]);
+  }, [stock, activeFilters, searchText, selectedUserIds, usersMap]);
 
   const totalFilteredQuantity = React.useMemo(() => {
     return filteredStockData.reduce((sum, item) => sum + item.quantity, 0);
@@ -502,7 +522,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     return Object.values(prefixGroups).sort((a, b) =>
       a.prefix.localeCompare(b.prefix)
     );
-  }, [stock, activeFilters, searchText]);
+  }, [filteredStockData]);
 
   const togglePrefix = (prefix: string) => {
     const newExpanded = new Set(expandedPrefixes);
@@ -984,55 +1004,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                           className={`border-t hover:bg-gray-50 cursor-pointer ${isSelectMode && isSelected ? 'bg-green-50' : ''}`}
                                           onClick={isSelectMode ? () => toggleItemSelection(item) : undefined}
                                         >
-                                          {visibleColumns.has('serialLotNumber') && (
-                                            <td className="p-2 border-r text-slate-600">
-                                              {isEditing ? (
-                                                <Input
-                                                  value={editingValues.serialLotNumber || ''}
-                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
-                                                    ...editingValues,
-                                                    serialLotNumber: e.target.value
-                                                  })}
-                                                  className="h-8"
-                                                />
-                                              ) : (
-                                                item.serialLotNumber
-                                              )}
-                                            </td>
-                                          )}
-                                          {visibleColumns.has('ubbCode') && (
-                                            <td className="p-2 border-r text-slate-600">
-                                              {isEditing ? (
-                                                <Input
-                                                  value={editingValues.ubbCode || ''}
-                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
-                                                    ...editingValues,
-                                                    ubbCode: e.target.value
-                                                  })}
-                                                  className="h-8"
-                                                />
-                                              ) : (
-                                                item.ubbCode
-                                              )}
-                                            </td>
-                                          )}
-                                          {visibleColumns.has('expiryDate') && (
-                                            <td className="p-2 border-r text-slate-600">
-                                              {isEditing ? (
-                                                <Input
-                                                  type="date"
-                                                  value={editingValues.expiryDate || ''}
-                                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingValues({
-                                                    ...editingValues,
-                                                    expiryDate: e.target.value
-                                                  })}
-                                                  className="h-8"
-                                                />
-                                              ) : (
-                                                item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('tr-TR') : '-'
-                                              )}
-                                            </td>
-                                          )}
+
                                           {dynamicColumns.filter(col => visibleColumns.has(col.id)).map(column => (
                                             <td key={column.id} className="p-2 border-r text-slate-600">
                                               {isEditing && ['serialLotNumber', 'ubbCode', 'expiryDate', 'quantity'].includes(column.id) ? (
@@ -1087,25 +1059,23 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
                                                   (item as any).ownerName || '-'
                                                 ) : column.id === 'dateAdded' ? (
                                                   item.dateAdded ? new Date(item.dateAdded).toLocaleDateString('tr-TR') : '-'
-                                                ) : (
-                                                  (item as any)[column.id] || '-'
-                                                )
+                                                ) : (() => {
+                                                  // Base stock fields that live directly on item
+                                                  const baseFields = ['serialLotNumber', 'ubbCode', 'expiryDate', 'quantity', 'from', 'to', 'materialCode', 'ownerName', 'dateAdded'];
+                                                  if (baseFields.includes(column.id)) {
+                                                    return (item as any)[column.id] || '-';
+                                                  }
+                                                  // Custom fields live on the matched product
+                                                  const customField = customFields.find(f => f.id === column.id);
+                                                  const rawValue = product?.customFields?.[column.id] || '-';
+                                                  if (rawValue === '-' || !customField?.isClassified) return rawValue;
+                                                  return `${customField.name.substring(0, 1).toUpperCase()}: ${rawValue}`;
+                                                })()
                                               )}
                                             </td>
                                           ))}
 
-                                          {/* Dynamic Custom Fields from Product */}
-                                          {customFields
-                                            .filter(f => !['quantity', 'serial_number', 'lot_number', 'expiry_date', 'ubb_code', 'product_code'].includes(f.id) && f.isActive)
-                                            .map(field => visibleColumns.has(field.id) && (
-                                              <td key={field.id} className="p-2 border-r text-slate-600">
-                                                {(() => {
-                                                  const rawValue = product?.customFields?.[field.id] || '-';
-                                                  if (rawValue === '-' || !field.isClassified) return rawValue;
-                                                  return `${field.name.substring(0, 1).toUpperCase()}: ${rawValue}`;
-                                                })()}
-                                              </td>
-                                            ))}
+
 
                                           <td className="p-2 text-center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                             {isEditing ? (

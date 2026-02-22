@@ -42,10 +42,12 @@ public class Notification {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private NotificationStatus status = NotificationStatus.PENDING;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action_status")
+    @Builder.Default
     private NotificationActionStatus actionStatus = NotificationActionStatus.WAITING;
 
     @CreatedDate

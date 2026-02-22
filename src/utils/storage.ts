@@ -116,9 +116,10 @@ export const storage = {
 
   saveCase: async (caseRecord: CaseRecord) => {
     try {
+      const user = storage.getUser();
       const savedCase = await caseService.create({
         ...caseRecord,
-        userId: '00000000-0000-0000-0000-000000000002' // Default test user
+        userId: user?.id
       });
       await storage.getCases(); // refresh local
       return savedCase;
@@ -244,7 +245,8 @@ export const storage = {
   // Kontrol listesi işlemleri - Migrated to backend
   getChecklists: async (): Promise<ChecklistRecord[]> => {
     try {
-      const checklists = await checklistService.getAll('00000000-0000-0000-0000-000000000002');
+      const user = storage.getUser();
+      const checklists = await checklistService.getAll(user?.id ?? '');
       localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklists));
       return checklists;
     } catch (error) {
@@ -255,7 +257,8 @@ export const storage = {
 
   saveChecklist: async (checklist: ChecklistRecord) => {
     try {
-      const saved = await checklistService.create('00000000-0000-0000-0000-000000000002', checklist);
+      const user = storage.getUser();
+      const saved = await checklistService.create(user!.id, checklist);
       await storage.getChecklists();
       return saved;
     } catch (error) {
@@ -268,7 +271,8 @@ export const storage = {
 
   updateChecklist: async (checklist: ChecklistRecord) => {
     try {
-      const updated = await checklistService.update(checklist.id, '00000000-0000-0000-0000-000000000002', checklist);
+      const user = storage.getUser();
+      const updated = await checklistService.update(checklist.id, user!.id, checklist);
       await storage.getChecklists();
       return updated;
     } catch (error) {
@@ -284,7 +288,8 @@ export const storage = {
 
   completeChecklist: async (id: string) => {
     try {
-      const completed = await checklistService.complete(id, '00000000-0000-0000-0000-000000000002');
+      const user = storage.getUser();
+      const completed = await checklistService.complete(id, user!.id);
       await storage.getChecklists();
       return completed;
     } catch (error) {
@@ -301,7 +306,8 @@ export const storage = {
 
   getActiveChecklist: async (): Promise<ChecklistRecord | null> => {
     try {
-      const active = await checklistService.getActive('00000000-0000-0000-0000-000000000002');
+      const user = storage.getUser();
+      const active = await checklistService.getActive(user?.id ?? '');
       return active;
     } catch (error) {
       const checklists = await storage.getChecklists();

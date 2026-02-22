@@ -9,7 +9,7 @@ import com.stok.app.repository.HistoryRecordRepository;
 import com.stok.app.repository.UserRepository;
 import com.stok.app.repository.CaseRecordRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

@@ -1,6 +1,5 @@
 package com.stok.app.security;
 
-import com.stok.app.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
