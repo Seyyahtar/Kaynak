@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Page, CaseRecord, StockItem } from '@/types';
-import { storage } from '@/utils/storage';
+import { Page, StockItem } from '@/types';
 import { HOSPITALS, isValidHospital } from '@/utils/hospitals';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { api } from '@/utils/api';
+import { stockService } from '@/services/stockService';
+import { storage } from '@/utils/storage';
 
 interface CaseEntryProps {
   onNavigate: (page: Page) => void;
@@ -36,8 +38,15 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
 
   useEffect(() => {
     const loadStock = async () => {
-      const data = await storage.getStock();
-      setStockItems(data);
+      try {
+        const user = storage.getUser();
+        if (user) {
+          const data = await stockService.getAll(user.id);
+          setStockItems(data);
+        }
+      } catch (error) {
+        toast.error('Stok bilgileri alınamadı');
+      }
     };
     loadStock();
   }, []);
@@ -67,10 +76,17 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
 
       if (field === 'serialLotNumber' && value.trim() !== '') {
         const matchingItems = stockItems.filter(item =>
-          item.serialLotNumber.toLowerCase().includes(value.toLowerCase())
+          item.serialLotNumber && item.serialLotNumber.toLowerCase().includes(value.toLowerCase())
+        );
+        console.log(`[Auto-fill Debug] typed: "${value}", matchingItems count: ${matchingItems.length}`, matchingItems);
+
+        // Check if all matching entries belong to the exact same distinct product variant
+        const uniqueMatches = Array.from(
+          new Set(matchingItems.map(i => `${i.materialName}|${i.serialLotNumber}|${i.ubbCode || ''}`))
         );
 
-        if (matchingItems.length === 1) {
+        if (uniqueMatches.length === 1) {
+          console.log('[Auto-fill Debug] Auto-filling for 1 unique distinct match:', matchingItems[0]);
           const matchedItem = matchingItems[0];
           updated.materialName = matchedItem.materialName;
           updated.serialLotNumber = matchedItem.serialLotNumber;
@@ -138,52 +154,37 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
       return;
     }
 
-    const materialsToRemove = validMaterials.map((m) => ({
-      materialName: m.materialName,
-      serialLotNumber: m.serialLotNumber,
-      quantity: parseInt(m.quantity),
-    }));
+    try {
+      const requestPayload = {
+        caseDate: formData.date,
+        hospitalName: formData.hospitalName,
+        doctorName: formData.doctorName,
+        patientName: formData.patientName,
+        notes: formData.notes || undefined,
+        materials: validMaterials.map((m) => ({
+          materialName: m.materialName,
+          serialLotNumber: m.serialLotNumber,
+          ubbCode: m.ubbCode,
+          quantity: parseInt(m.quantity),
+        })),
+      };
 
-    // Backend handles stock removal now
-    // await storage.removeStock(materialsToRemove);
+      await api.post('/cases', requestPayload);
+      toast.success('Vaka kaydı başarıyla oluşturuldu');
 
-    const caseRecord: CaseRecord = {
-      id: Date.now().toString(),
-      date: formData.date,
-      hospitalName: formData.hospitalName,
-      doctorName: formData.doctorName,
-      patientName: formData.patientName,
-      notes: formData.notes || undefined,
-      materials: validMaterials.map((m) => ({
-        materialName: m.materialName,
-        serialLotNumber: m.serialLotNumber,
-        ubbCode: m.ubbCode,
-        quantity: parseInt(m.quantity),
-      })),
-    };
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        hospitalName: '',
+        doctorName: '',
+        patientName: '',
+        notes: '',
+      });
+      setMaterials([]);
 
-    await storage.saveCase(caseRecord);
-
-    await storage.addHistory({
-      id: Date.now().toString(),
-      date: formData.date,
-      type: 'case',
-      description: `Vaka kaydı - ${formData.hospitalName} - Dr. ${formData.doctorName}`,
-      details: caseRecord,
-    });
-
-    toast.success('Vaka kaydı başarıyla oluşturuldu');
-
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      hospitalName: '',
-      doctorName: '',
-      patientName: '',
-      notes: '',
-    });
-    setMaterials([]);
-
-    onNavigate('history');
+      onNavigate('history');
+    } catch (error: any) {
+      toast.error(error.message || 'Vaka kaydedilirken hata oluştu');
+    }
   };
 
   return (

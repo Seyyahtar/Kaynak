@@ -26,7 +26,7 @@ public class CaseController {
     private final CaseService caseService;
     private final com.stok.app.repository.UserRepository userRepository; // Inject UserRepository
 
-    private UUID getEffectiveUserId(UUID userId) {
+    private UUID getEffectiveUserId(UUID userId, boolean allowReadAlL) {
         org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
 
@@ -46,7 +46,8 @@ public class CaseController {
         if (isPrivileged) {
             if (userId != null)
                 return userId;
-            return null; // Return null to fetch ALL data
+            return allowReadAlL ? null : currentUser.getId(); // Return null ONLY if reading all is allowed, else use
+                                                              // self
         }
 
         // Regular user: Must use their own ID
@@ -59,7 +60,7 @@ public class CaseController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<CaseRecordResponse>>> getAllCases(
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = getEffectiveUserId(userId);
+        UUID effectiveUserId = getEffectiveUserId(userId, true);
         List<CaseRecordResponse> cases = caseService.getAllCases(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(cases));
     }
@@ -68,7 +69,7 @@ public class CaseController {
     public ResponseEntity<ApiResponse<CaseRecordResponse>> getCaseById(
             @PathVariable UUID id,
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = getEffectiveUserId(userId);
+        UUID effectiveUserId = getEffectiveUserId(userId, true);
         CaseRecordResponse caseRecord = caseService.getCaseById(id, effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success(caseRecord));
     }
@@ -77,7 +78,7 @@ public class CaseController {
     public ResponseEntity<ApiResponse<CaseRecordResponse>> createCase(
             @Valid @RequestBody CaseRecordRequest request,
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = getEffectiveUserId(userId);
+        UUID effectiveUserId = getEffectiveUserId(userId, false); // Creates must belong to *someone*
         CaseRecordResponse caseRecord = caseService.createCase(request, effectiveUserId);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -87,7 +88,7 @@ public class CaseController {
     @DeleteMapping("/all")
     public ResponseEntity<ApiResponse<Void>> deleteAllCases(
             @RequestParam(required = false) UUID userId) {
-        UUID effectiveUserId = getEffectiveUserId(userId);
+        UUID effectiveUserId = getEffectiveUserId(userId, false);
         caseService.deleteAllCases(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("All case records deleted successfully", null));
     }

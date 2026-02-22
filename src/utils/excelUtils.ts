@@ -268,6 +268,7 @@ export const importFromExcel = (file: File): Promise<StockItem[]> => {
 // Vaka kayıtlarından implant listesi dışa aktar
 export const exportImplantList = async (
   cases: CaseRecord[],
+  products: Product[],
   currentUser: string,
   filename: string = "implant_listesi.xlsx",
   templateData?: ArrayBuffer | null
@@ -287,7 +288,13 @@ export const exportImplantList = async (
       "serial no #",
     ];
 
-    const workbook = XLSX.read(templateData, { type: "array" });
+    const workbook = XLSX.read(templateData, {
+      type: "array",
+      cellStyles: true,
+      cellFormula: true,
+      cellNF: true,
+      bookVBA: true,
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     if (!worksheet) {
@@ -328,15 +335,28 @@ export const exportImplantList = async (
       headerRowIndex >= 0 ? headerRowIndex + 1 : rows.length;
 
     const entries = cases.flatMap((c) =>
-      c.materials.map((m) => ({
-        documentDate: c.date,
-        customerName: c.hospitalName,
-        implanter: c.doctorName,
-        patient: c.patientName,
-        materialName: m.materialName,
-        quantity: m.quantity,
-        serialNo: m.serialLotNumber,
-      }))
+      c.materials.map((m) => {
+        let formattedDate = c.date;
+        const dateObj = new Date(c.date);
+        if (!isNaN(dateObj.getTime())) {
+          const d = dateObj.getDate().toString().padStart(2, '0');
+          const mo = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+          const y = dateObj.getFullYear();
+          formattedDate = `${d}.${mo}.${y}`;
+        }
+
+        const product = products.find(p => p.name === m.materialName);
+
+        return {
+          documentDate: formattedDate,
+          customerName: c.hospitalName,
+          implanter: c.doctorName,
+          patient: c.patientName,
+          materialName: product ? product.name : m.materialName, // Ürün katalogda varsa oradaki adını, yoksa stoktaki adını yaz
+          quantity: m.quantity,
+          serialNo: m.serialLotNumber,
+        };
+      })
     );
 
     if (entries.length === 0) {
@@ -350,7 +370,17 @@ export const exportImplantList = async (
         const c = headerMap[key];
         if (c === undefined) return;
         const addr = XLSX.utils.encode_cell({ r, c });
-        worksheet[addr] = { t: type, v: value ?? "" };
+
+        let finalValue = value ?? "";
+        let finalType = type;
+
+        if (!worksheet[addr]) {
+          worksheet[addr] = { t: finalType, v: finalValue };
+        } else {
+          // Preserve existing cell metadata (formatting/styles) if present
+          worksheet[addr].t = finalType;
+          worksheet[addr].v = finalValue;
+        }
       };
 
       set("document date", e.documentDate);

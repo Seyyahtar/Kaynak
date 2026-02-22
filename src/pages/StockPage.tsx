@@ -390,7 +390,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
 
     try {
       const fileLabel = 'BIO-TR_implant_list_' + implantStartDate + '_' + implantEndDate + '.xlsx';
-      await exportImplantList(filtered, currentUser, fileLabel, implantTemplateData);
+      await exportImplantList(filtered, products, currentUser, fileLabel, implantTemplateData);
       toast.success(filtered.length + ' vaka için implant listesi oluşturuldu. Paylaşım menüsünden konum seçin.');
     } catch (err) {
       console.error(err);

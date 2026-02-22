@@ -103,7 +103,23 @@ public class CaseService {
         details.put("hospitalName", saved.getHospitalName());
         details.put("doctorName", saved.getDoctorName());
         details.put("patientName", saved.getPatientName());
+        details.put("date", saved.getCaseDate().toString());
+        if (saved.getNotes() != null && !saved.getNotes().isEmpty()) {
+            details.put("notes", saved.getNotes());
+        }
         details.put("materialsCount", saved.getMaterials().size());
+
+        List<Map<String, Object>> materialsForHistory = saved.getMaterials().stream().map(m -> {
+            Map<String, Object> matMap = new HashMap<>();
+            matMap.put("materialName", m.getMaterialName());
+            matMap.put("serialLotNumber", m.getSerialLotNumber());
+            matMap.put("ubbCode", m.getUbbCode());
+            matMap.put("quantity", m.getQuantity());
+            return matMap;
+        }).collect(Collectors.toList());
+
+        details.put("materials", materialsForHistory);
+
         historyService.addHistory(
                 userId,
                 "case",
