@@ -46,22 +46,27 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         loadData();
     }, []);
 
-    const loadData = () => {
-        setProducts(productService.getProducts());
-        setFields(customFieldService.getCustomFields());
+    const loadData = async () => {
+        try {
+            setProducts(await productService.getProducts());
+            setFields(await customFieldService.getCustomFields());
+        } catch (error: any) {
+            toast.error('Ürün listesi yüklenirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
+            console.error('loadData error:', error);
+        }
     };
 
     const handleDeleteProduct = (productId: string) => {
         setDeleteProductId(productId);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!deleteProductId) return;
 
         try {
-            productService.deleteProduct(deleteProductId);
+            await productService.deleteProduct(deleteProductId);
             toast.success('Ürün başarıyla silindi');
-            loadData();
+            await loadData();
         } catch (error: any) {
             toast.error(error.message || 'Ürün silinirken hata oluştu');
         } finally {
@@ -142,11 +147,11 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         setSelectedProducts(newSelected);
     };
 
-    const handleDeleteAll = () => {
+    const handleDeleteAll = async () => {
         try {
-            products.forEach(p => productService.deleteProduct(p.id));
+            await productService.deleteAllProducts();
             toast.success('Tüm ürünler silindi');
-            loadData();
+            await loadData();
             setShowDeleteAllDialog(false);
             setSelectedProducts(new Set());
             setIsMultiDeleteMode(false);
@@ -155,13 +160,13 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
         }
     };
 
-    const handleDeleteSelected = () => {
+    const handleDeleteSelected = async () => {
         try {
-            selectedProducts.forEach(id => productService.deleteProduct(id));
+            await Promise.all(Array.from(selectedProducts).map(id => productService.deleteProduct(id)));
             toast.success(`${selectedProducts.size} ürün silindi`);
             setSelectedProducts(new Set());
             setIsMultiDeleteMode(false);
-            loadData();
+            await loadData();
             setShowDeleteSelectedDialog(false);
         } catch (error) {
             toast.error('Silme işlemi başarısız');

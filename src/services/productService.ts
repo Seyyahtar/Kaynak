@@ -1,129 +1,94 @@
+import { api } from '../utils/api';
 import { Product } from '../types';
 
-const STORAGE_KEY = 'products';
+// Map backend ProductItemResponse to frontend Product type
+const mapFromBackend = (item: any): Product => ({
+    id: item.id,
+    name: item.name,
+    productCode: item.productCode || '',
+    quantity: item.quantity,
+    serialNumber: item.serialNumber || '',
+    lotNumber: item.lotNumber || '',
+    expiryDate: item.expiryDate || '',
+    ubbCode: item.ubbCode || '',
+    customFields: item.customFields || {},
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+});
+
+// Map frontend Product to backend request body
+const mapToBackend = (data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> | Partial<Product>) => ({
+    name: (data as any).name,
+    productCode: (data as any).productCode || null,
+    quantity: (data as any).quantity ?? null,
+    serialNumber: (data as any).serialNumber || null,
+    lotNumber: (data as any).lotNumber || null,
+    expiryDate: (data as any).expiryDate || null,
+    ubbCode: (data as any).ubbCode || null,
+    customFields: (data as any).customFields || {},
+});
 
 class ProductService {
-    // Get all products
-    getProducts(): Product[] {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) return [];
 
+    async getProducts(): Promise<Product[]> {
+        const items: any[] = await api.get('/products');
+        return items.map(mapFromBackend);
+    }
+
+    async getProductById(id: string): Promise<Product | undefined> {
         try {
-            return JSON.parse(data);
-        } catch (error) {
-            console.error('Error parsing products:', error);
-            return [];
+            const item: any = await api.get(`/products/${id}`);
+            return mapFromBackend(item);
+        } catch {
+            return undefined;
         }
     }
 
-    // Get product by ID
-    getProductById(id: string): Product | undefined {
-        const products = this.getProducts();
-        return products.find(p => p.id === id);
+    async createProduct(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+        const item: any = await api.post('/products', mapToBackend(productData));
+        return mapFromBackend(item);
     }
 
-    // Create a new product
-    createProduct(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Product {
-        // Check if product name already exists
-        if (this.isProductNameExists(productData.name)) {
-            throw new Error('Bu ürün adı zaten kullanılıyor');
-        }
-
-        const products = this.getProducts();
-        const now = new Date().toISOString();
-
-        const newProduct: Product = {
-            ...productData,
-            id: `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            createdAt: now,
-            updatedAt: now,
-        };
-
-        products.push(newProduct);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-
-        return newProduct;
+    async updateProduct(id: string, productData: Partial<Product>): Promise<Product> {
+        const item: any = await api.put(`/products/${id}`, mapToBackend(productData));
+        return mapFromBackend(item);
     }
 
-    // Update an existing product
-    updateProduct(id: string, productData: Partial<Product>): Product {
-        const products = this.getProducts();
-        const index = products.findIndex(p => p.id === id);
-
-        if (index === -1) {
-            throw new Error('Ürün bulunamadı');
-        }
-
-        // Check product name uniqueness (excluding current product)
-        if (productData.name && this.isProductNameExists(productData.name, id)) {
-            throw new Error('Bu ürün adı zaten kullanılıyor');
-        }
-
-        const updatedProduct: Product = {
-            ...products[index],
-            ...productData,
-            id, // Keep original ID
-            createdAt: products[index].createdAt, // Keep original creation date
-            updatedAt: new Date().toISOString(),
-        };
-
-        products[index] = updatedProduct;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-
-        return updatedProduct;
+    async deleteProduct(id: string): Promise<void> {
+        await api.delete(`/products/${id}`);
     }
 
-    // Delete a product
-    deleteProduct(id: string): void {
-        const products = this.getProducts();
-        const filteredProducts = products.filter(p => p.id !== id);
-
-        if (filteredProducts.length === products.length) {
-            throw new Error('Ürün bulunamadı');
-        }
-
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredProducts));
+    async deleteAllProducts(): Promise<void> {
+        await api.delete('/products/all');
     }
 
-    // Get product by Product Code
-    getProductByProductCode(productCode: string): Product | undefined {
-        const products = this.getProducts();
-        const code = productCode.trim();
-        return products.find(p => p.productCode === code);
+    async bulkCreateProducts(products: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<Product[]> {
+        const items: any[] = await api.post('/products/bulk', products.map(mapToBackend));
+        return items.map(mapFromBackend);
     }
 
-    // Check if a product name already exists
-    isProductNameExists(name: string, excludeId?: string): boolean {
-        const products = this.getProducts();
-        const normalizedName = name.trim().toLowerCase();
-
-        return products.some(product =>
-            product.name.toLowerCase() === normalizedName && product.id !== excludeId
-        );
+    async getProductByProductCode(productCode: string): Promise<Product | undefined> {
+        const all = await this.getProducts();
+        return all.find(p => p.productCode === productCode.trim());
     }
 
-    // Check if a product code already exists
-    isProductCodeExists(code: string, excludeId?: string): boolean {
+    async isProductNameExists(name: string, excludeId?: string): Promise<boolean> {
+        const all = await this.getProducts();
+        const normalized = name.trim().toLowerCase();
+        return all.some(p => p.name.toLowerCase() === normalized && p.id !== excludeId);
+    }
+
+    async isProductCodeExists(code: string, excludeId?: string): Promise<boolean> {
         if (!code) return false;
-        const products = this.getProducts();
-        const normalizedCode = code.trim();
-
-        return products.some(product =>
-            product.productCode === normalizedCode && product.id !== excludeId
-        );
+        const all = await this.getProducts();
+        const normalized = code.trim();
+        return all.some(p => p.productCode === normalized && p.id !== excludeId);
     }
 
-    // Get all unique custom field IDs used across all products
-    getUsedCustomFieldIds(): string[] {
-        const products = this.getProducts();
+    async getUsedCustomFieldIds(): Promise<string[]> {
+        const products = await this.getProducts();
         const fieldIds = new Set<string>();
-
-        products.forEach(product => {
-            Object.keys(product.customFields).forEach(fieldId => {
-                fieldIds.add(fieldId);
-            });
-        });
-
+        products.forEach(p => Object.keys(p.customFields).forEach(id => fieldIds.add(id)));
         return Array.from(fieldIds);
     }
 }

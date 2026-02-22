@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,11 +36,20 @@ public class UserController {
     private final UserService userService;
 
     /**
-     * Get all users - Admin/Yönetici only
+     * Get all users - Admin/Yonetici/Depo
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'YONETICI')")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers() {
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(Authentication authentication) {
+        boolean canListUsers = authentication != null
+                && authentication.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")
+                                || a.getAuthority().equals("ROLE_YONETICI")
+                                || a.getAuthority().equals("ROLE_DEPO"));
+
+        if (!canListUsers) {
+            throw new AccessDeniedException("You do not have permission to perform this action.");
+        }
+
         log.debug("Getting all users");
         List<UserResponse> users = userService.getAllUsers();
         return ResponseEntity.ok(ApiResponse.success(users));

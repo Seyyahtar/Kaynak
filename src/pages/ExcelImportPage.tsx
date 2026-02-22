@@ -42,7 +42,11 @@ interface ExcelImportPageProps {
 
 export default function ExcelImportPage({ onNavigate, importData }: ExcelImportPageProps) {
     const { columns, rows } = importData;
-    const [existingFields] = useState<CustomField[]>(customFieldService.getCustomFields());
+    const [existingFields, setExistingFields] = useState<CustomField[]>([]);
+
+    React.useEffect(() => {
+        customFieldService.getCustomFields().then(setExistingFields);
+    }, []);
 
     const [mappings, setMappings] = useState<ColumnMapping[]>(
         columns.map(col => {
@@ -289,7 +293,7 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
 
             for (const mapping of newFields) {
                 if (mapping.newFieldName) {
-                    const newField = customFieldService.addCustomField(
+                    const newField = await customFieldService.addCustomField(
                         mapping.newFieldName,
                         mapping.newFieldType || 'text'
                     );
@@ -403,7 +407,7 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                             continue;
                         }
 
-                        const existingProduct = productService.getProductByProductCode(productData.productCode);
+                        const existingProduct = await productService.getProductByProductCode(productData.productCode);
                         if (existingProduct) {
                             // Merge data
                             const updatedData = {
@@ -414,7 +418,7 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
                                     ...productData.customFields
                                 }
                             };
-                            productService.updateProduct(existingProduct.id, updatedData);
+                            await productService.updateProduct(existingProduct.id, updatedData);
                             successCount++;
                         } else {
                             notFoundCount++;

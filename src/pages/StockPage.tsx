@@ -145,9 +145,9 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     }
   }
 
-  const loadDynamicData = () => {
-    setProducts(productService.getProducts());
-    setCustomFields(customFieldService.getCustomFields());
+  const loadDynamicData = async () => {
+    setProducts(await productService.getProducts());
+    setCustomFields(await customFieldService.getCustomFields());
   };
 
   const loadVisibilitySettings = () => {

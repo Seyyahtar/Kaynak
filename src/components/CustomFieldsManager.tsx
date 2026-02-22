@@ -6,7 +6,6 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card } from './ui/card';
 import { customFieldService } from '../services/customFieldService';
-import { productService } from '../services/productService';
 import { CustomField, FieldDataType } from '../types';
 import { toast } from 'sonner';
 import {
@@ -37,23 +36,23 @@ export default function CustomFieldsManager({ isOpen, onClose }: CustomFieldsMan
         }
     }, [isOpen]);
 
-    const loadFields = () => {
-        const allFields = customFieldService.getCustomFields();
+    const loadFields = async () => {
+        const allFields = await customFieldService.getCustomFields();
         setFields(allFields);
     };
 
-    const handleAddField = () => {
+    const handleAddField = async () => {
         if (!newFieldName.trim()) {
             toast.error('Başlık adı boş olamaz');
             return;
         }
 
         try {
-            customFieldService.addCustomField(newFieldName, newFieldDataType);
+            await customFieldService.addCustomField(newFieldName, newFieldDataType);
             toast.success('Başlık başarıyla eklendi');
             setNewFieldName('');
             setNewFieldDataType('text');
-            loadFields();
+            await loadFields();
         } catch (error: any) {
             toast.error(error.message || 'Başlık eklenirken hata oluştu');
         }
@@ -63,24 +62,13 @@ export default function CustomFieldsManager({ isOpen, onClose }: CustomFieldsMan
         setDeleteFieldId(fieldId);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!deleteFieldId) return;
 
         try {
-            // Delete the custom field
-            customFieldService.deleteCustomField(deleteFieldId);
-
-            // Clean up products: remove this field from all products
-            const products = productService.getProducts();
-            products.forEach((product: any) => {
-                if (product.customFields && product.customFields[deleteFieldId]) {
-                    delete product.customFields[deleteFieldId];
-                    productService.updateProduct(product.id, product);
-                }
-            });
-
-            toast.success('Başlık silindi ve tüm ürünlerden kaldırıldı');
-            loadFields();
+            await customFieldService.deleteCustomField(deleteFieldId);
+            toast.success('Başlık silindi');
+            await loadFields();
         } catch (error: any) {
             toast.error(error.message || 'Başlık silinirken hata oluştu');
         } finally {

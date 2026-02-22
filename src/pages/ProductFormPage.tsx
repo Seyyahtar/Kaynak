@@ -35,23 +35,24 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
     const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
     useEffect(() => {
-        // Load custom fields
-        const userFields = customFieldService.getUserCustomFields();
-        setAvailableFields(userFields);
+        const loadCustomFields = async () => {
+            const userFields = await customFieldService.getUserCustomFields();
+            setAvailableFields(userFields);
 
-        // If editing, load existing custom field values
-        if (editProduct) {
-            const selectedIds = new Set<string>();
-            const values: Record<string, any> = {};
+            if (editProduct) {
+                const selectedIds = new Set<string>();
+                const values: Record<string, any> = {};
 
-            Object.entries(editProduct.customFields).forEach(([fieldId, value]) => {
-                selectedIds.add(fieldId);
-                values[fieldId] = value;
-            });
+                Object.entries(editProduct.customFields).forEach(([fieldId, value]) => {
+                    selectedIds.add(fieldId);
+                    values[fieldId] = value;
+                });
 
-            setSelectedFieldIds(selectedIds);
-            setCustomFieldValues(values);
-        }
+                setSelectedFieldIds(selectedIds);
+                setCustomFieldValues(values);
+            }
+        };
+        loadCustomFields();
     }, [editProduct]);
 
     const handleFieldToggle = (fieldId: string) => {
@@ -85,7 +86,7 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         // Validation
         if (!productName.trim()) {
             toast.error('Ürün adı zorunludur');
@@ -111,10 +112,10 @@ export default function ProductFormPage({ onNavigate, editProduct }: ProductForm
             };
 
             if (isEditMode) {
-                productService.updateProduct(editProduct.id, productData);
+                await productService.updateProduct(editProduct.id, productData);
                 toast.success('Ürün başarıyla güncellendi');
             } else {
-                productService.createProduct(productData);
+                await productService.createProduct(productData);
                 toast.success('Ürün başarıyla eklendi');
             }
 

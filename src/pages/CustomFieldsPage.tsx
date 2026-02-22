@@ -35,60 +35,49 @@ export default function CustomFieldsPage({ onNavigate }: CustomFieldsPageProps) 
         loadFields();
     }, []);
 
-    const loadFields = () => {
-        const allFields = customFieldService.getCustomFields();
+    const loadFields = async () => {
+        const allFields = await customFieldService.getCustomFields();
         setFields(allFields);
     };
 
-    const handleAddField = () => {
+    const handleAddField = async () => {
         if (!newFieldName.trim()) {
             toast.error('Başlık adı boş olamaz');
             return;
         }
 
         try {
-            customFieldService.addCustomField(newFieldName, newFieldDataType);
+            await customFieldService.addCustomField(newFieldName, newFieldDataType);
             toast.success('Başlık başarıyla eklendi');
             setNewFieldName('');
             setNewFieldDataType('text');
-            loadFields();
+            await loadFields();
         } catch (error: any) {
             toast.error(error.message || 'Başlık eklenirken hata oluştu');
         }
     };
 
-    const handleToggleField = (fieldId: string) => {
-        customFieldService.toggleFieldStatus(fieldId);
-        loadFields();
+    const handleToggleField = async (fieldId: string) => {
+        await customFieldService.toggleFieldStatus(fieldId);
+        await loadFields();
     };
 
-    const handleToggleClassification = (fieldId: string) => {
-        customFieldService.toggleFieldClassification(fieldId);
-        loadFields();
+    const handleToggleClassification = async (fieldId: string) => {
+        await customFieldService.toggleFieldClassification(fieldId);
+        await loadFields();
     };
 
     const handleDeleteField = (fieldId: string) => {
         setDeleteFieldId(fieldId);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!deleteFieldId) return;
 
         try {
-            // Delete the custom field
-            customFieldService.deleteCustomField(deleteFieldId);
-
-            // Clean up products: remove this field from all products
-            const products = productService.getProducts();
-            products.forEach((product: any) => {
-                if (product.customFields && product.customFields[deleteFieldId]) {
-                    delete product.customFields[deleteFieldId];
-                    productService.updateProduct(product.id, product);
-                }
-            });
-
-            toast.success('Başlık silindi ve tüm ürünlerden kaldırıldı');
-            loadFields();
+            await customFieldService.deleteCustomField(deleteFieldId);
+            toast.success('Başlık silindi');
+            await loadFields();
         } catch (error: any) {
             toast.error(error.message || 'Başlık silinirken hata oluştu');
         } finally {
