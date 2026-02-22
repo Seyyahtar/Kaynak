@@ -94,7 +94,8 @@ export type Page =
   | 'product-list'
   | 'product-form'
   | 'custom-fields'
-  | 'excel-import';
+  | 'excel-import'
+  | 'manage-user-detail';
 
 // Product Management Types
 export type FieldDataType = 'text' | 'number' | 'date' | 'mixed' | 'none';

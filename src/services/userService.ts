@@ -83,4 +83,40 @@ export const userService = {
             throw error;
         }
     },
+
+    /**
+     * Update user details (Admin only)
+     */
+    async updateUserDetails(userId: string, data: { username: string; fullName: string; email?: string; phone?: string; region?: string }): Promise<User> {
+        try {
+            return await api.put<User>(`/users/${userId}/details`, data);
+        } catch (error) {
+            console.error('Error updating user details:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update user active status (Admin only)
+     */
+    async updateUserActiveStatus(userId: string, active: boolean): Promise<User> {
+        try {
+            return await api.put<User>(`/users/${userId}/active`, { active });
+        } catch (error) {
+            console.error('Error updating user active status:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Reset user password (Admin only)
+     */
+    async resetUserPassword(userId: string, newPassword: string): Promise<void> {
+        try {
+            await api.put<void>(`/users/${userId}/reset-password`, { newPassword });
+        } catch (error) {
+            console.error('Error resetting user password:', error);
+            throw error;
+        }
+    },
 };

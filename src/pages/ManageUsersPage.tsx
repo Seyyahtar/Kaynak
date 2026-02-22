@@ -28,7 +28,7 @@ export default function ManageUsersPage({ onNavigate, currentUser }: ManageUsers
     const loadCurrentUser = async () => {
         const user = storage.getUser();
         if (user) {
-            setCurrentUserData(user);
+            setCurrentUserData(user as any); // Type assertion or simple pass, actually user from storage may not need 2 args. Ah wait, setCurrentUserData takes user.
         }
     };
 
@@ -44,42 +44,8 @@ export default function ManageUsersPage({ onNavigate, currentUser }: ManageUsers
         }
     };
 
-    const handleDeleteUser = async (user: User) => {
-        // Kendini silmeye çalışıyorsa
-        if (user.username === currentUser) {
-            toast.error('Kendinizi silemezsiniz!');
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `"${user.fullName}" kullanıcısını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`
-        );
-
-        if (!confirmed) return;
-
-        try {
-            await userService.deleteUser(user.id);
-            toast.success('Kullanıcı başarıyla silindi');
-            loadUsers();
-        } catch (error: any) {
-            toast.error('Kullanıcı silinemedi: ' + error.message);
-        }
-    };
-
-    const handleRoleChange = async (user: User, newRole: UserRole) => {
-        // Kendinin rolünü değiştirmeye çalışıyorsa
-        if (user.username === currentUser) {
-            toast.error('Kendi rolünüzü değiştiremezsiniz!');
-            return;
-        }
-
-        try {
-            await userService.updateUserRole(user.id, newRole);
-            toast.success('Kullanıcı rolü güncellendi');
-            loadUsers();
-        } catch (error: any) {
-            toast.error('Rol güncellenemedi: ' + error.message);
-        }
+    const handleOpenManage = (user: User) => {
+        onNavigate('manage-user-detail', { user });
     };
 
     const getRoleBadgeColor = (role: UserRole) => {
@@ -210,31 +176,15 @@ export default function ManageUsersPage({ onNavigate, currentUser }: ManageUsers
 
                                     {/* Actions - Only for Admin */}
                                     {isAdmin && !isCurrentUser && (
-                                        <div className="space-y-2 pt-3 border-t">
-                                            {/* Role Change */}
-                                            <div className="space-y-1">
-                                                <Label className="text-xs text-slate-600">Rol Değiştir</Label>
-                                                <select
-                                                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    value={user.role}
-                                                    onChange={(e) => handleRoleChange(user, e.target.value as UserRole)}
-                                                >
-                                                    <option value="KULLANICI">Kullanıcı</option>
-                                                    <option value="DEPO">Depo</option>
-                                                    <option value="YONETICI">Yönetici</option>
-                                                    <option value="ADMIN">Admin</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Delete Button */}
+                                        <div className="pt-3 border-t">
                                             <Button
-                                                variant="destructive"
+                                                variant="outline"
                                                 size="sm"
                                                 className="w-full"
-                                                onClick={() => handleDeleteUser(user)}
+                                                onClick={() => handleOpenManage(user)}
                                             >
-                                                <Trash2 className="w-4 h-4 mr-2" />
-                                                Kullanıcıyı Sil
+                                                <Shield className="w-4 h-4 mr-2" />
+                                                Yönet
                                             </Button>
                                         </div>
                                     )}

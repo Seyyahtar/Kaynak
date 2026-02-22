@@ -63,6 +63,15 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
         if (u.username) map.set(u.username, u.id);
       });
       setUsersMap(map);
+
+      // Check if we came from ManageUsersPage to view a specific user's history
+      const focusUserId = localStorage.getItem('history_focus_user_id');
+      if (focusUserId) {
+        const initialFilter = new Set<string>();
+        initialFilter.add(focusUserId);
+        setSelectedUserIds(initialFilter);
+        localStorage.removeItem('history_focus_user_id');
+      }
     } catch (e) {
       console.error("Failed to load users for mapping", e);
     }

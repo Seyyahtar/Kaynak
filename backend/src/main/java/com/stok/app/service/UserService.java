@@ -214,6 +214,73 @@ public class UserService {
         log.info("Password changed for user: {}", user.getUsername());
     }
 
+    /**
+     * Reset user password by admin
+     */
+    public void resetUserPasswordByAdmin(UUID userId, String newPassword) {
+        log.debug("Admin resetting password for user: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        auditLogService.log("PASSWORD_RESET_BY_ADMIN", "User", userId.toString(),
+                "Password reset by admin for user: " + user.getUsername());
+
+        log.info("Password reset by admin for user: {}", user.getUsername());
+    }
+
+    /**
+     * Update user details (name, email, etc.) - Admin only
+     */
+    public UserResponse updateUserDetails(UUID userId, com.stok.app.dto.request.UpdateUserDetailsRequest request) {
+        log.debug("Updating details for user: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Check if username is being changed and if it already exists
+        if (!user.getUsername().equals(request.getUsername())
+                && userRepository.existsByUsername(request.getUsername())) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+
+        user.setUsername(request.getUsername());
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setRegion(request.getRegion());
+
+        User updated = userRepository.save(user);
+
+        auditLogService.log("USER_DETAILS_UPDATED", "User", updated.getId().toString(),
+                "Details updated by admin for user: " + updated.getUsername());
+
+        log.info("User details updated: {}", updated.getUsername());
+        return mapToResponse(updated);
+    }
+
+    /**
+     * Update user active status - Admin only
+     */
+    public UserResponse updateUserActiveStatus(UUID userId, boolean active) {
+        log.debug("Updating active status for user: {} to {}", userId, active);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setActive(active);
+        User updated = userRepository.save(user);
+
+        auditLogService.log("USER_STATUS_UPDATED", "User", updated.getId().toString(),
+                "Active status changed to " + active + " for user: " + updated.getUsername());
+
+        log.info("User active status updated: {} to {}", updated.getUsername(), active);
+        return mapToResponse(updated);
+    }
+
     private UserResponse mapToResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())

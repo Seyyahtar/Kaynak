@@ -12,6 +12,7 @@ import SettingsPage from './pages/SettingsPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import AddUserPage from './pages/AddUserPage';
 import ManageUsersPage from './pages/ManageUsersPage';
+import ManageUserDetailPage from './pages/ManageUserDetailPage';
 import ProductListPage from './pages/ProductListPage';
 import ProductFormPage from './pages/ProductFormPage';
 import CustomFieldsPage from './pages/CustomFieldsPage';
@@ -124,7 +125,7 @@ export default function App() {
   };
 
   const handleNavigate = (page: Page, data?: any) => {
-    if ((page === 'stock-management' || page === 'product-form' || page === 'excel-import') && data) {
+    if ((page === 'stock-management' || page === 'product-form' || page === 'excel-import' || page === 'manage-user-detail') && data) {
       setPrefillData(data);
     } else {
       setPrefillData(null);
@@ -166,6 +167,8 @@ export default function App() {
         return <AddUserPage onNavigate={handleNavigate} currentUser={currentUser} />;
       case 'manage-users':
         return <ManageUsersPage onNavigate={handleNavigate} currentUser={currentUser} />;
+      case 'manage-user-detail':
+        return <ManageUserDetailPage onNavigate={handleNavigate} currentUser={currentUser} user={prefillData?.user} />;
       case 'product-list':
         return <ProductListPage onNavigate={handleNavigate} />;
       case 'product-form':

@@ -3,6 +3,9 @@ package com.stok.app.controller;
 import com.stok.app.dto.request.ChangePasswordRequest;
 import com.stok.app.dto.request.CreateUserRequest;
 import com.stok.app.dto.request.UpdateUserRoleRequest;
+import com.stok.app.dto.request.UpdateUserDetailsRequest;
+import com.stok.app.dto.request.UpdateUserActiveRequest;
+import com.stok.app.dto.request.ResetPasswordAdminRequest;
 import com.stok.app.dto.response.ApiResponse;
 import com.stok.app.dto.response.UserResponse;
 import com.stok.app.service.UserService;
@@ -89,5 +92,44 @@ public class UserController {
         log.debug("Changing password for user: {}", id);
         userService.changePassword(id, request.getOldPassword(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
+    }
+
+    /**
+     * Update user details - Admin only
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/details")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserDetails(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateUserDetailsRequest request) {
+        log.debug("Updating details for user: {}", id);
+        UserResponse user = userService.updateUserDetails(id, request);
+        return ResponseEntity.ok(ApiResponse.success("User details updated successfully", user));
+    }
+
+    /**
+     * Update user active status - Admin only
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/active")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserActiveStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateUserActiveRequest request) {
+        log.debug("Updating active status for user: {}", id);
+        UserResponse user = userService.updateUserActiveStatus(id, request.getActive());
+        return ResponseEntity.ok(ApiResponse.success("User status updated successfully", user));
+    }
+
+    /**
+     * Reset password by admin
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetUserPasswordByAdmin(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResetPasswordAdminRequest request) {
+        log.debug("Admin resetting password for user: {}", id);
+        userService.resetUserPasswordByAdmin(id, request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully", null));
     }
 }
