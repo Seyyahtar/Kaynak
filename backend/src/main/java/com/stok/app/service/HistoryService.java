@@ -33,14 +33,25 @@ public class HistoryService {
     private final UserRepository userRepository;
     private final CaseRecordRepository caseRecordRepository;
 
-    public List<HistoryRecordResponse> getAllHistory(UUID userId) {
-        log.debug("Getting history for user: {}", userId != null ? userId : "ALL USERS");
-        List<HistoryRecord> records;
-        if (userId != null) {
-            records = historyRecordRepository.findByUserIdOrderByRecordDateDesc(userId);
-        } else {
-            records = historyRecordRepository.findAllByOrderByRecordDateDesc();
-        }
+    public List<HistoryRecordResponse> getAllHistory(
+            UUID effectiveUserId,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String type,
+            String search,
+            List<UUID> userIds) {
+
+        log.debug("Getting history with filters. effectiveUser: {}, startDate: {}, endDate: {}, search: {}",
+                effectiveUserId != null ? effectiveUserId : "ALL USERS", startDate, endDate, search);
+
+        org.springframework.data.jpa.domain.Specification<HistoryRecord> spec = com.stok.app.repository.specification.HistorySpecification
+                .withFilters(
+                        startDate, endDate, type, search, userIds, effectiveUserId);
+
+        List<HistoryRecord> records = historyRecordRepository.findAll(
+                spec, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
+                        "recordDate"));
+
         return records.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

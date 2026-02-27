@@ -15,6 +15,43 @@ const toInitials = (fullName: string) => {
   return initials.length ? initials.join('.') : '';
 };
 
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Blob base64 dönüştürülemedi'));
+    reader.readAsDataURL(blob);
+  });
+};
+
+export const saveExcelBlob = async (blob: Blob, filename: string) => {
+  if (Capacitor.getPlatform() === "web") {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+    return { success: true, path: null };
+  }
+
+  const base64 = await blobToBase64(blob);
+  const downloadPath = `Download/${filename}`;
+  await Filesystem.writeFile({
+    path: downloadPath,
+    data: base64,
+    directory: Directory.ExternalStorage,
+  });
+
+  return { success: true, path: downloadPath };
+};
+
 // Stok için Excel içe aktarımı (3 farklı formatı destekler)
 export const importFromExcel = (file: File): Promise<StockItem[]> => {
   return new Promise((resolve, reject) => {

@@ -1,10 +1,10 @@
 import { toast } from 'sonner';
 import { stockService } from './stockService';
 import { caseService } from './caseService';
-import { historyService } from './historyService';
 import { storage } from '../utils/storage';
 
-export type ActionType = 'ADD_STOCK' | 'UPDATE_STOCK' | 'DELETE_STOCK' | 'ADD_CASE' | 'ADD_HISTORY';
+// ADD_HISTORY removed: backend now handles history creation automatically in all services
+export type ActionType = 'ADD_STOCK' | 'UPDATE_STOCK' | 'DELETE_STOCK' | 'ADD_CASE';
 
 export interface OfflineAction {
     id: string;
@@ -68,9 +68,7 @@ export const syncService = {
                     case 'ADD_CASE':
                         await caseService.create({ ...action.payload, userId });
                         break;
-                    case 'ADD_HISTORY':
-                        await historyService.create({ ...action.payload, userId });
-                        break;
+                    // ADD_HISTORY is removed because the backend automatically tracks history
                 }
                 pushedCount++;
             } catch (error) {

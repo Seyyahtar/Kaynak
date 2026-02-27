@@ -1,0 +1,69 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.stok:stok-yonetim-backend >--------------------
+[INFO] Building Stok Y÷netim Backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ stok-yonetim-backend ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 7 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ stok-yonetim-backend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 81 source files with javac [debug release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[5,27] cannot find symbol
+  symbol:   class Product
+  location: package com.stok.app.entity
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[6,31] cannot find symbol
+  symbol:   class CaseRepository
+  location: package com.stok.app.repository
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[7,31] cannot find symbol
+  symbol:   class ProductRepository
+  location: package com.stok.app.repository
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[27,19] cannot find symbol
+  symbol:   class CaseRepository
+  location: class com.stok.app.service.ExcelExportService
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[28,19] cannot find symbol
+  symbol:   class ProductRepository
+  location: class com.stok.app.service.ExcelExportService
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[23,1] cannot find symbol
+  symbol:   class CaseRepository
+  location: class com.stok.app.service.ExcelExportService
+[INFO] 6 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.853 s
+[INFO] Finished at: 2026-02-23T00:41:22+03:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project stok-yonetim-backend: Compilation failure: Compilation failure: 
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[5,27] cannot find symbol
+[ERROR]   symbol:   class Product
+[ERROR]   location: package com.stok.app.entity
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[6,31] cannot find symbol
+[ERROR]   symbol:   class CaseRepository
+[ERROR]   location: package com.stok.app.repository
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[7,31] cannot find symbol
+[ERROR]   symbol:   class ProductRepository
+[ERROR]   location: package com.stok.app.repository
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[27,19] cannot find symbol
+[ERROR]   symbol:   class CaseRepository
+[ERROR]   location: class com.stok.app.service.ExcelExportService
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[28,19] cannot find symbol
+[ERROR]   symbol:   class ProductRepository
+[ERROR]   location: class com.stok.app.service.ExcelExportService
+[ERROR] /D:/GitHub/Kaynak/backend/src/main/java/com/stok/app/service/ExcelExportService.java:[23,1] cannot find symbol
+[ERROR]   symbol:   class CaseRepository
+[ERROR]   location: class com.stok.app.service.ExcelExportService
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -62,12 +62,89 @@ public class StockService {
                 .collect(Collectors.toList());
     }
 
-    public StockItemResponse addStockItem(StockItemRequest request, UUID userId) {
-        return addStockItem(request, userId, true, false); // Default: Don't allow merge for manual add
+    /**
+     * Search stock items by serial/lot number or material name.
+     * Returns up to 10 matches for auto-fill suggestions.
+     */
+    @Transactional(readOnly = true)
+    public List<StockItemResponse> searchStock(UUID userId, String query) {
+        log.debug("Searching stock for user: {} with query: {}", userId, query);
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
+        }
+        List<StockItem> items = stockItemRepository.searchByQuery(
+                userId, query.trim(), org.springframework.data.domain.PageRequest.of(0, 10));
+        return items.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
     }
 
-    private StockItemResponse addStockItem(StockItemRequest request, UUID userId, boolean addHistory,
-            boolean allowMerge) {
+    public List<com.stok.app.dto.response.PrefixGroupResponse> getGroupedStocks(
+            UUID effectiveUserId, String search, String categoryId, List<UUID> userIds) {
+
+        log.debug("Getting grouped stock. effectiveUser: {}, search: {}, category: {}",
+                effectiveUserId, search, categoryId);
+
+        org.springframework.data.jpa.domain.Specification<StockItem> spec = com.stok.app.repository.specification.StockSpecification
+                .withFilters(
+                        search, categoryId, userIds, effectiveUserId);
+
+        List<StockItem> items = stockItemRepository.findAll(spec);
+
+        // Group by Material Name
+        java.util.Map<String, List<StockItem>> groupedByMaterial = items.stream()
+                .collect(Collectors.groupingBy(StockItem::getMaterialName));
+
+        List<com.stok.app.dto.response.MaterialGroupResponse> materialGroups = groupedByMaterial.entrySet().stream()
+                .map(entry -> {
+                    String materialName = entry.getKey();
+                    List<StockItem> materialItems = entry.getValue();
+                    long totalQ = materialItems.stream().mapToLong(StockItem::getQuantity).sum();
+
+                    return com.stok.app.dto.response.MaterialGroupResponse.builder()
+                            .fullName(materialName)
+                            .totalQuantity(totalQ)
+                            .items(materialItems.stream().map(this::mapToResponse).collect(Collectors.toList()))
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Group by Prefix (first word of the material name)
+        java.util.Map<String, List<com.stok.app.dto.response.MaterialGroupResponse>> groupedByPrefix = materialGroups
+                .stream()
+                .collect(Collectors.groupingBy(mg -> {
+                    String[] parts = mg.getFullName().trim().split("\\s+");
+                    return parts.length > 0 ? parts[0] : mg.getFullName();
+                }));
+
+        List<com.stok.app.dto.response.PrefixGroupResponse> prefixGroups = groupedByPrefix.entrySet().stream()
+                .map(entry -> {
+                    String prefix = entry.getKey();
+                    List<com.stok.app.dto.response.MaterialGroupResponse> mgList = entry.getValue();
+                    long prefixTotalQ = mgList.stream()
+                            .mapToLong(com.stok.app.dto.response.MaterialGroupResponse::getTotalQuantity).sum();
+
+                    // Sort materials alphabetically within the prefix
+                    mgList.sort((a, b) -> a.getFullName().compareToIgnoreCase(b.getFullName()));
+
+                    return com.stok.app.dto.response.PrefixGroupResponse.builder()
+                            .prefix(prefix)
+                            .totalQuantity(prefixTotalQ)
+                            .materials(mgList)
+                            .build();
+                })
+                .sorted((a, b) -> a.getPrefix().compareToIgnoreCase(b.getPrefix())) // Sort prefixes alphabetically
+                .collect(Collectors.toList());
+
+        return prefixGroups;
+    }
+
+    public StockItemResponse addStockItem(StockItemRequest request, UUID userId) {
+        return addStockItem(request, userId, false); // Default: Don't allow merge for manual add
+    }
+
+    private StockItemResponse addStockItem(StockItemRequest request, UUID userId, boolean allowMerge) {
         log.debug("Adding stock item: {} for user: {}", request.getMaterialName(), userId);
 
         User user = userRepository.findById(userId)
@@ -109,18 +186,16 @@ public class StockService {
 
         StockItem saved = stockItemRepository.save(stockItem);
 
-        if (addHistory) {
-            // Add history record
-            Map<String, Object> details = new HashMap<>();
-            details.put("materialName", saved.getMaterialName());
-            details.put("serialLotNumber", saved.getSerialLotNumber());
-            details.put("quantity", saved.getQuantity());
-            historyService.addHistory(
-                    userId,
-                    "stock-add",
-                    "Stok eklendi: " + saved.getMaterialName(),
-                    details);
-        }
+        // Unconditionally log to history for new additions
+        Map<String, Object> details = new HashMap<>();
+        details.put("materialName", saved.getMaterialName());
+        details.put("serialLotNumber", saved.getSerialLotNumber());
+        details.put("quantity", saved.getQuantity());
+        historyService.addHistory(
+                userId,
+                "stock-add",
+                "Stok eklendi: " + saved.getMaterialName(),
+                details);
 
         auditLogService.log("CREATE_STOCK", "StockItem", saved.getId().toString(),
                 "Added material: " + saved.getMaterialName());
@@ -133,8 +208,25 @@ public class StockService {
         log.info("Bulk adding {} stock items for user: {}", requests.size(), userId);
 
         List<StockItemResponse> results = requests.stream()
-                .map(req -> addStockItem(req, userId, false, false)) // Default: false for bulk import too? Or true?
-                                                                     // Let's keep false effectively
+                .map(req -> {
+                    // Manually construct to avoid triggering history per-item during bulk
+                    StockItem stockItem = new StockItem();
+                    stockItem.setMaterialName(req.getMaterialName());
+                    stockItem.setSerialLotNumber(req.getSerialLotNumber());
+                    stockItem.setUbbCode(req.getUbbCode());
+                    stockItem.setExpiryDate(req.getExpiryDate());
+                    stockItem.setQuantity(req.getQuantity());
+                    stockItem.setDateAdded(req.getDateAdded());
+                    stockItem.setFromField(req.getFromField());
+                    stockItem.setToField(req.getToField());
+                    stockItem.setMaterialCode(req.getMaterialCode());
+
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                    stockItem.setUser(user);
+
+                    return mapToResponse(stockItemRepository.save(stockItem));
+                })
                 .collect(Collectors.toList());
 
         // Add ONE single history record for the whole batch
@@ -151,6 +243,71 @@ public class StockService {
                 details);
 
         return results;
+    }
+
+    /**
+     * Bulk import with server-side duplicate detection.
+     * Silently skips items that already exist and returns a detailed result.
+     *
+     * @param requests list of stock items to import
+     * @param userId   owner of the stock
+     * @return result including saved items and list of skipped duplicates
+     */
+    public com.stok.app.dto.response.BulkImportResponse bulkImportWithDuplicateCheck(
+            List<StockItemRequest> requests, UUID userId) {
+        log.info("Bulk import with duplicate check: {} items for user: {}", requests.size(), userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<StockItemResponse> savedItems = new java.util.ArrayList<>();
+        List<String> skippedItems = new java.util.ArrayList<>();
+
+        for (StockItemRequest req : requests) {
+            boolean isDuplicate = stockItemRepository
+                    .findByMaterialNameAndSerialLotNumberAndUserId(
+                            req.getMaterialName(), req.getSerialLotNumber(), userId)
+                    .isPresent();
+
+            if (isDuplicate) {
+                skippedItems.add(req.getMaterialName() + " (" + req.getSerialLotNumber() + ")");
+                continue;
+            }
+
+            // Save new item without individual history
+            StockItem stockItem = new StockItem();
+            stockItem.setMaterialName(req.getMaterialName());
+            stockItem.setSerialLotNumber(req.getSerialLotNumber());
+            stockItem.setUbbCode(req.getUbbCode());
+            stockItem.setExpiryDate(req.getExpiryDate());
+            stockItem.setQuantity(req.getQuantity());
+            stockItem.setDateAdded(req.getDateAdded());
+            stockItem.setFromField(req.getFromField());
+            stockItem.setToField(req.getToField());
+            stockItem.setMaterialCode(req.getMaterialCode());
+            stockItem.setUser(user);
+            StockItem saved = stockItemRepository.save(stockItem);
+            savedItems.add(mapToResponse(saved));
+        }
+
+        // Add a single history record for the whole batch (only if anything was saved)
+        if (!savedItems.isEmpty()) {
+            int totalQuantity = savedItems.stream().mapToInt(StockItemResponse::getQuantity).sum();
+            Map<String, Object> details = new HashMap<>();
+            details.put("count", savedItems.size());
+            details.put("totalQuantity", totalQuantity);
+            historyService.addHistory(
+                    userId,
+                    "stock-add",
+                    String.format("Toplu stok girişi: %d kalem (%d adet) malzeme eklendi%s",
+                            savedItems.size(), totalQuantity,
+                            skippedItems.isEmpty() ? "" : " (" + skippedItems.size() + " mükerrer atlandı)"),
+                    details);
+        }
+
+        int savedQuantity = savedItems.stream().mapToInt(StockItemResponse::getQuantity).sum();
+        return new com.stok.app.dto.response.BulkImportResponse(
+                savedItems.size(), savedQuantity, skippedItems.size(), skippedItems, savedItems);
     }
 
     public StockItemResponse updateStockItem(UUID id, UUID userId, StockItemRequest request) {
@@ -384,7 +541,7 @@ public class StockService {
             // Add items to receiver
             for (Map<String, Object> itemData : items) {
                 StockItemRequest req = mapToRequest(itemData);
-                addStockItem(req, receiver.getId(), false, true); // Allow Merge = TRUE
+                addStockItem(req, receiver.getId(), true); // Allow Merge = TRUE
             }
 
             // Update Notification
@@ -441,7 +598,7 @@ public class StockService {
             if (sender != null) {
                 for (Map<String, Object> itemData : items) {
                     StockItemRequest tempReq = mapToRequest(itemData);
-                    addStockItem(tempReq, sender.getId(), false, true); // Allow Merge = TRUE for return too
+                    addStockItem(tempReq, sender.getId(), true); // Allow Merge = TRUE for return too
                 }
 
                 // Notify Sender

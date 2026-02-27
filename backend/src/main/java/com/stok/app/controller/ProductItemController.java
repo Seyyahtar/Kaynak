@@ -1,11 +1,15 @@
 package com.stok.app.controller;
 
 import com.stok.app.dto.request.ProductItemRequest;
+import com.stok.app.dto.request.ProductImportRequest;
 import com.stok.app.dto.response.ApiResponse;
 import com.stok.app.dto.response.ProductItemResponse;
+import com.stok.app.dto.response.ProductImportResponse;
 import com.stok.app.service.ProductItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +37,19 @@ public class ProductItemController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProductItemResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success(productItemService.getAll()));
+    }
+
+    /**
+     * Sayfalandırılmış ürünleri getir - tüm kullanıcılar
+     */
+    @GetMapping("/page")
+    public ResponseEntity<ApiResponse<Page<ProductItemResponse>>> getPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "index") String sortField,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        return ResponseEntity.ok(ApiResponse.success(
+                productItemService.getPage(PageRequest.of(page, size), sortField, sortDir)));
     }
 
     /**
@@ -65,6 +82,17 @@ public class ProductItemController {
         List<ProductItemResponse> created = productItemService.bulkCreate(requests);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Ürünler eklendi", created));
+    }
+
+    /**
+     * Gelişmiş Excel içe aktar (Mapping) - sadece ADMIN / YÖNETİCİ
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'YONETICI')")
+    @PostMapping("/bulk-import")
+    public ResponseEntity<ApiResponse<ProductImportResponse>> bulkImportProductExcel(
+            @RequestBody ProductImportRequest request) {
+        ProductImportResponse result = productItemService.bulkImportProductExcel(request);
+        return ResponseEntity.ok(ApiResponse.success("Excel içe aktarma tamamlandı", result));
     }
 
     /**

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, Plus, Minus, ArrowLeft, Upload, Download, Trash2, ArrowRightLeft, Edit, Check, Menu, Filter, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { StockItem, Page } from '@/types';
 import { storage } from '@/utils/storage';
 import { toast } from 'sonner';
-import { importFromExcel, exportToExcel, exportImplantList } from '@/utils/excelUtils';
+import { importFromExcel, exportToExcel, saveExcelBlob } from '@/utils/excelUtils';
 import DeviceGrouping from '@/components/DeviceGrouping';
 import { productService } from '@/services/productService';
 import { customFieldService } from '@/services/customFieldService';
@@ -15,6 +15,7 @@ import { Product, CustomField, UserRole } from '@/types';
 import { UserFilter } from '@/components/UserFilter';
 import { userService } from '@/services/userService';
 import { stockService } from '@/services/stockService';
+import { caseService } from '@/services/caseService';
 
 import {
   Sheet,
@@ -25,9 +26,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
-
-const DEFAULT_IMPLANT_TEMPLATE_URL = '/Implant list.xlsx';
-const DEFAULT_IMPLANT_TEMPLATE_NAME = 'Implant list.xlsx';
 
 const STORAGE_KEY_COLUMNS = 'stock_visible_columns';
 const STORAGE_KEY_INACTIVE = 'inactive_fields';
@@ -70,7 +68,10 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [expandedPrefixes, setExpandedPrefixes] = useState<Set<string>>(new Set());
   const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set());
-  const [stock, setStock] = useState<StockItem[]>([]);
+  const [groupedStock, setGroupedStock] = useState<PrefixGroup[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]); // Keep flat list for export/search if needed, or remove later if fully migrated
+  const [totalItemCount, setTotalItemCount] = useState(0);
+  const [totalFilteredQuantity, setTotalFilteredQuantity] = useState(0);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<Partial<StockItem>>({});
   const [sortStates, setSortStates] = useState<{ [key: string]: { field: SortField | null, order: SortOrder } }>({});
@@ -78,7 +79,6 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const [implantExportOpen, setImplantExportOpen] = useState(false);
   const [implantStartDate, setImplantStartDate] = useState(defaultStartStr);
   const [implantEndDate, setImplantEndDate] = useState(todayStr);
-  const [implantTemplateData, setImplantTemplateData] = useState<ArrayBuffer | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set()); // For selection mode
 
   // User Filter State
@@ -127,8 +127,8 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   }, []);
 
   useEffect(() => {
-    loadStock(selectedUserIds);
-  }, [selectedUserIds]);
+    loadStock(selectedUserIds, activeFilters, searchText);
+  }, [selectedUserIds, activeFilters, searchText]);
 
   const loadCurrentUserRole = () => {
     setCurrentUserRole(storage.getUser()?.role);
@@ -189,41 +189,54 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(allIds));
   };
 
-  useEffect(() => {
-    if (implantTemplateData) return;
-
-    const loadDefaultTemplate = async () => {
-      try {
-        const response = await fetch(encodeURI(DEFAULT_IMPLANT_TEMPLATE_URL));
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const buffer = await response.arrayBuffer();
-        setImplantTemplateData(buffer);
-      } catch (error) {
-        console.warn('Varsayilan implant sablonu yuklenemedi', error);
-        toast.error('Varsayilan implant sablonu yuklenemedi. Lutfen yeniden deneyin.');
-      }
-    };
-
-    loadDefaultTemplate();
-  }, [implantTemplateData]);
-
-  const loadStock = async (userIds?: Set<string>) => {
+  const loadStock = async (userIds?: Set<string>, filters?: Set<string>, search?: string) => {
     try {
-      let data: StockItem[] = [];
+      // For backwards compatibility of export/device grouping, we might still need flat stock
+      // But the main view will use groupedStock
+
+      const activeFilters: any = {};
+
+      if (search) activeFilters.search = search;
+
+      // Map frontend Set filters ('lead', 'sheath') to a single category if only one is selected
+      // Actually, frontend allowed multiple categories, but Backend only accepts one category string currently.
+      // Let's pass the first active filter as category for now, or adapt backend to accept list later.
+      if (filters && filters.size > 0) {
+        activeFilters.category = Array.from(filters)[0];
+      }
 
       if (userIds && userIds.size > 0) {
-        // Seçili kullanıcıların stok verilerini getir
-        const promises = Array.from(userIds).map(id => stockService.getAll(id));
-        const results = await Promise.all(promises);
-        data = results.flat();
-      } else {
-        // Varsayılan: Mevcut kullanıcının stok verilerini storage'dan getir
-        data = await storage.getStock();
+        activeFilters.userIds = Array.from(userIds);
       }
 
-      setStock(data);
+      // Fetch grouped payload
+      const groupedData = await stockService.getGrouped(activeFilters);
+      setGroupedStock(groupedData);
+
+      // Calculate totals from grouped data
+      let itemCount = 0;
+      let totalQty = 0;
+      groupedData.forEach(pg => {
+        totalQty += pg.totalQuantity;
+        pg.materials.forEach((mg: any) => {
+          itemCount += mg.items.length;
+        });
+      });
+      setTotalItemCount(itemCount);
+      setTotalFilteredQuantity(totalQty);
+
+      // Also fetch flat stock for DeviceGrouping and Export
+      // In a real optimized scenario, endpoints for Device Grouping / Export should be separate
+      let flatData: StockItem[] = [];
+      if (userIds && userIds.size > 0) {
+        const promises = Array.from(userIds).map(id => stockService.getAll(id));
+        const results = await Promise.all(promises);
+        flatData = results.flat();
+      } else {
+        flatData = await storage.getStock();
+      }
+      setStock(flatData);
+
     } catch (error) {
       console.error("Stok yüklenirken hata:", error);
       toast.error("Stok verileri yüklenemedi");
@@ -240,83 +253,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     setActiveFilters(newFilters);
   };
 
-  const filterStockByCategory = (item: StockItem): boolean => {
-    // Eğer hiç filtre seçili değilse, tümünü göster
-    if (activeFilters.size === 0) return true;
-
-    const materialName = item.materialName.toLowerCase();
-
-    // Lead filtresi
-    if (activeFilters.has('lead')) {
-      if (materialName.includes('solia') ||
-        materialName.includes('sentus') ||
-        materialName.includes('plexa')) {
-        return true;
-      }
-    }
-
-    // Sheath filtresi
-    if (activeFilters.has('sheath')) {
-      if (materialName.includes('safesheath') ||
-        materialName.includes('adelante') ||
-        materialName.includes('li-7') ||
-        materialName.includes('li-8')) {
-        return true;
-      }
-    }
-
-    // Pacemaker filtresi
-    if (activeFilters.has('pacemaker')) {
-      if (materialName.includes('amvia sky') ||
-        materialName.includes('endicos') ||
-        materialName.includes('enitra') ||
-        materialName.includes('edora')) {
-        return true;
-      }
-    }
-
-    // ICD filtresi (VR-T veya DR-T içeren ama pacemaker olmayan)
-    if (activeFilters.has('icd')) {
-      const isPacemaker = materialName.includes('amvia sky') ||
-        materialName.includes('endicos') ||
-        materialName.includes('enitra') ||
-        materialName.includes('edora');
-      if (!isPacemaker && (materialName.includes('vr-t') || materialName.includes('dr-t'))) {
-        return true;
-      }
-    }
-
-    // CRT filtresi
-    if (activeFilters.has('crt')) {
-      if (materialName.includes('hf-t')) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  const filterStockBySearch = (item: StockItem): boolean => {
-    if (!searchText.trim()) return true;
-
-    const search = searchText.toLowerCase();
-    return item.materialName.toLowerCase().includes(search) ||
-      item.serialLotNumber.toLowerCase().includes(search) ||
-      item.ubbCode.toLowerCase().includes(search);
-  };
-
-  const filterStockByUser = (item: StockItem): boolean => {
-    if (selectedUserIds.size === 0) return true;
-    // item.ownerName serves as the identifier in the UI for now, but filtering usually works best with IDs.
-    // However, our backend DTO sends ownerName.
-    // If we want exact filtering, we might need to map ownerName back to ID or filter by ownerName directly if UserFilter returned names.
-    // But UserFilter returns IDs.
-    // Let's use the usersMap to find the ID for the item.ownerName
-
-    if (!item.ownerName) return false; // Should not happen for admin view if backend works
-    const ownerId = usersMap.get(item.ownerName);
-    return ownerId ? selectedUserIds.has(ownerId) : false;
-  };
+  // Client-side filtering functions removed because backend is handling it now
 
   const toggleItemSelection = (item: StockItem) => {
     const newSelected = new Set(selectedItems);
@@ -358,14 +295,8 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
       return;
     }
 
-    if (!implantTemplateData) {
-      toast.error('Varsayilan sablon kullanilamadi, lutfen bir sablon dosyasi secin');
-      return;
-    }
-
     const start = new Date(implantStartDate);
     const end = new Date(implantEndDate);
-    end.setHours(23, 59, 59, 999);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       toast.error('Gecerli tarih girin');
@@ -377,24 +308,20 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
       return;
     }
 
-    const cases = await storage.getCases();
-    const filtered = cases.filter((c) => {
-      const d = new Date(c.date);
-      return !isNaN(d.getTime()) && d >= start && d <= end;
-    });
-
-    if (filtered.length === 0) {
-      toast.error('Bu tarih araliginda vaka bulunamadi');
-      return;
-    }
-
     try {
-      const fileLabel = 'BIO-TR_implant_list_' + implantStartDate + '_' + implantEndDate + '.xlsx';
-      await exportImplantList(filtered, products, currentUser, fileLabel, implantTemplateData);
-      toast.success(filtered.length + ' vaka için implant listesi oluşturuldu. Paylaşım menüsünden konum seçin.');
+      const { blob, filename } = await caseService.exportImplantList(
+        implantStartDate,
+        implantEndDate
+      );
+      const saveResult = await saveExcelBlob(blob, filename);
+      if (saveResult.path) {
+        toast.success('Implant listesi olusturuldu: ' + saveResult.path);
+      } else {
+        toast.success('Implant listesi olusturuldu ve indirildi');
+      }
     } catch (err) {
       console.error(err);
-      toast.error('Implant listesi disa aktarma hatasi');
+      toast.error((err as Error).message || 'Implant listesi disa aktarma hatasi');
     }
   };
 
@@ -414,36 +341,21 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
         return;
       }
 
-      // Duplicate kontrolü yap
-      const duplicates: string[] = [];
-      const uniqueItems: StockItem[] = [];
+      // Tek API çağrısı ile backend'de mükerrer kontrolü yap ve kaydet
+      const user = storage.getUser();
+      const result = await stockService.bulkImport(importedItems, user?.id);
 
-      for (const item of importedItems) {
-        if (await storage.checkDuplicate(item.materialName, item.serialLotNumber)) {
-          duplicates.push(`${item.materialName} (${item.serialLotNumber})`);
-        } else {
-          uniqueItems.push(item);
-        }
+      if (result.skippedCount > 0) {
+        const skippedPreview = result.skippedItems.slice(0, 3).join(', ');
+        toast.error(`${result.skippedCount} adet malzeme zaten stokta kayıtlı ve atlandı: ${skippedPreview}${result.skippedItems.length > 3 ? '...' : ''}`);
       }
 
-      if (duplicates.length > 0) {
-        toast.error(`${duplicates.length} adet malzeme zaten stokta kayıtlı ve atlandı: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}`);
-      }
-
-      if (uniqueItems.length === 0) {
+      if (result.savedCount === 0) {
         toast.error('Tüm malzemeler zaten stokta kayıtlı');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        return;
+      } else {
+        toast.success(`${result.savedCount} kayıt (${result.savedQuantity} adet) başarıyla içe aktarıldı${result.skippedCount > 0 ? ` (${result.skippedCount} kayıt atlandı)` : ''}`);
+        loadStock();
       }
-
-      // Toplu olarak unique item'ları storage'a ekle (backend tek geçmiş kaydı oluşturur)
-      await storage.bulkAddStock(uniqueItems);
-
-      const totalQuantity = uniqueItems.reduce((sum, item) => sum + item.quantity, 0);
-      toast.success(`${uniqueItems.length} kayıt (${totalQuantity} adet) başarıyla içe aktarıldı${duplicates.length > 0 ? ` (${duplicates.length} kayıt atlandı)` : ''}`);
-      loadStock();
 
       // Input'u temizle
       if (fileInputRef.current) {
@@ -454,75 +366,8 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
       console.error(error);
     }
   };
-  // Filtrelenmis stok sayisini hesapla
-  const filteredStockData = React.useMemo(() => {
-    return stock.filter(item => {
-      return filterStockByCategory(item) && filterStockBySearch(item) && filterStockByUser(item);
-    });
-  }, [stock, activeFilters, searchText, selectedUserIds, usersMap]);
-
-  const totalFilteredQuantity = React.useMemo(() => {
-    return filteredStockData.reduce((sum, item) => sum + item.quantity, 0);
-  }, [filteredStockData]);
-
-  const totalItemCount = React.useMemo(() => {
-    return filteredStockData.length;
-  }, [filteredStockData]);
-
-  const totalSelectedQuantity = React.useMemo(() => {
-    return stock.filter(item => selectedItems.has(item.id)).reduce((sum, item) => sum + item.quantity, 0);
-  }, [stock, selectedItems]);
-
-  // Hiyerarşik gruplandırma: Prefix -> Tam isim -> Detaylar
-  const hierarchicalGroups: PrefixGroup[] = React.useMemo(() => {
-    // Önce tam isme göre grupla
-    const materialGroups: { [key: string]: MaterialGroup } = {};
-
-    filteredStockData.forEach(item => {
-      if (!materialGroups[item.materialName]) {
-        materialGroups[item.materialName] = {
-          fullName: item.materialName,
-          totalQuantity: 0,
-          items: [],
-        };
-      }
-      materialGroups[item.materialName].totalQuantity += item.quantity;
-      materialGroups[item.materialName].items.push(item);
-
-      // Assign color to the group if all items belong to same user (or mixed?)
-      // Since grouping is by material name, it can contain items from multiple users.
-      // But usually we display individual lines in the accordion.
-      // We will handle coloring at the row level in the render.
-    });
-
-    // Sonra prefix'e göre grupla (ilk kelimeye göre)
-    const prefixGroups: { [key: string]: PrefixGroup } = {};
-
-    Object.values(materialGroups).forEach(materialGroup => {
-      // İlk kelimeyi prefix olarak al
-      const prefix = materialGroup.fullName.split(' ')[0];
-
-      if (!prefixGroups[prefix]) {
-        prefixGroups[prefix] = {
-          prefix,
-          totalQuantity: 0,
-          materials: [],
-        };
-      }
-
-      prefixGroups[prefix].totalQuantity += materialGroup.totalQuantity;
-      prefixGroups[prefix].materials.push(materialGroup);
-    });
-
-    // Her prefix grubu içindeki malzemeleri sırala
-    Object.values(prefixGroups).forEach(group => {
-      group.materials.sort((a, b) => a.fullName.localeCompare(b.fullName));
-    });
-
-    return Object.values(prefixGroups).sort((a, b) =>
-      a.prefix.localeCompare(b.prefix)
-    );
-  }, [filteredStockData]);
+  // Client-side computed variables and hierarchies removed.
+  // Using groupedStock directly from state.
 
   const togglePrefix = (prefix: string) => {
     const newExpanded = new Set(expandedPrefixes);
@@ -547,13 +392,6 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
   const handleDeleteItem = async (item: StockItem) => {
     if (window.confirm('Bu malzemeyi envanterden kaldırmak istediğinize emin misiniz?')) {
       await storage.deleteStockItem(item.id);
-      await storage.addHistory({
-        id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        type: 'stock-delete',
-        description: `${item.materialName} silindi (${item.quantity} adet) - ${currentUser}`,
-        details: item,
-      });
       toast.success('Malzeme envanterden kaldırıldı');
       loadStock();
     }
@@ -583,14 +421,6 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     };
 
     await storage.updateStockItem(item.id, updatedItem);
-    await storage.addHistory({
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
-      type: 'stock-remove',
-      description: `${item.materialName} düzenlendi - ${currentUser}`,
-      details: { old: item, new: updatedItem },
-    });
-
     toast.success('Malzeme başarıyla güncellendi');
     setEditingItemId(null);
     setEditingValues({});
@@ -692,7 +522,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
 
               {/* Center Text */}
               <div className="font-semibold text-lg absolute left-1/2 transform -translate-x-1/2 w-full text-center pointer-events-none">
-                {selectedItems.size} Malzeme <span className="text-blue-100 text-sm ml-1">({totalSelectedQuantity} Adet)</span>
+                {selectedItems.size} Malzeme <span className="text-blue-100 text-sm ml-1"></span>
               </div>
 
               {/* Right Filter Button */}
@@ -890,7 +720,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
 
       {/* Scrollable Content Area */}
       <div className={`flex-1 overflow-y-auto overflow-x-hidden p-4 ${isSelectMode ? 'pb-24' : ''}`}>
-        {hierarchicalGroups.length === 0 ? (
+        {groupedStock.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-slate-500">
               {(activeFilters.size > 0 || searchText)
@@ -900,7 +730,7 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
           </Card>
         ) : (
           <div className="space-y-2 pb-4">
-            {hierarchicalGroups.map((prefixGroup) => {
+            {groupedStock.map((prefixGroup) => {
               const isPrefixExpanded = expandedPrefixes.has(prefixGroup.prefix);
 
               return (
@@ -1186,3 +1016,4 @@ export default function StockPage({ onNavigate, currentUser, mode = 'view' }: St
     </div>
   );
 }
+

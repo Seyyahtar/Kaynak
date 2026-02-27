@@ -17,7 +17,31 @@ const mapToBackend = (item: Partial<StockItem>) => ({
 export const stockService = {
     getAll: (userId?: string) => api.get<StockItem[]>(`/stocks${userId ? `?userId=${userId}` : ''}`),
 
+    getGrouped: (filters?: {
+        search?: string;
+        category?: string;
+        userIds?: string[];
+        userId?: string;
+    }) => {
+        let queryString = '';
+        if (filters) {
+            const params = new URLSearchParams();
+            if (filters.search) params.append('search', filters.search);
+            if (filters.category && filters.category !== 'all') params.append('category', filters.category);
+            if (filters.userId) params.append('userId', filters.userId);
+            if (filters.userIds && filters.userIds.length > 0) {
+                params.append('userIds', filters.userIds.join(','));
+            }
+            queryString = `?${params.toString()}`;
+        }
+        // Returns PrefixGroupResponse[]
+        return api.get<any[]>(`/stocks/grouped${queryString}`);
+    },
+
     getById: (id: string, userId?: string) => api.get<StockItem>(`/stocks/${id}${userId ? `?userId=${userId}` : ''}`),
+
+    search: (query: string, userId?: string) => api.get<StockItem[]>(`/stocks/search?query=${encodeURIComponent(query)}${userId ? `&userId=${userId}` : ''}`),
+
 
     create: (item: Partial<StockItem>, userId?: string) => api.post<StockItem>(`/stocks${userId ? `?userId=${userId}` : ''}`, mapToBackend(item)),
 
@@ -29,7 +53,14 @@ export const stockService = {
 
     bulkCreate: (items: Partial<StockItem>[], userId?: string) => api.post<StockItem[]>(`/stocks/bulk${userId ? `?userId=${userId}` : ''}`, items.map(mapToBackend)),
 
-    bulkUpdate: (items: any[], userId?: string) => api.post(`/stocks/bulk-update${userId ? `?userId=${userId}` : ''}`, items),
+    bulkImport: (items: Partial<StockItem>[], userId?: string) => api.post<{
+        savedCount: number;
+        savedQuantity: number;
+        skippedCount: number;
+        skippedItems: string[];
+        savedItems: StockItem[];
+    }>(`/stocks/bulk-import${userId ? `?userId=${userId}` : ''}`, items.map(mapToBackend)),
+
 
     initiateTransfer: (receiverId: string, items: { stockItemId: string; quantity: number }[], userId?: string) => api.post(`/stocks/transfer${userId ? `?userId=${userId}` : ''}`, { receiverId, items }),
 

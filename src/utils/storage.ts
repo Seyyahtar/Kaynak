@@ -3,7 +3,8 @@
 import { StockItem, CaseRecord, HistoryRecord, User, ChecklistRecord } from '../types';
 import { stockService } from '../services/stockService';
 import { caseService } from '../services/caseService';
-import { historyService } from '../services/historyService';
+// historyService removed from imports - backend handles history creation automatically
+import { historyService } from '../services/historyService'; // kept for getHistory/delete reads
 import { checklistService } from '../services/checklistService';
 import { syncService } from '../services/syncService';
 
@@ -136,27 +137,12 @@ export const storage = {
   getHistory: async (): Promise<HistoryRecord[]> => {
     try {
       const user = storage.getUser();
-      const history = await historyService.getAll(user?.id);
+      const history = await historyService.getAll({ userId: user?.id });
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       return history;
     } catch (error) {
       const data = localStorage.getItem(HISTORY_KEY);
       return data ? JSON.parse(data) : [];
-    }
-  },
-
-  addHistory: async (record: HistoryRecord) => {
-    try {
-      await historyService.create({
-        ...record,
-        userId: '00000000-0000-0000-0000-000000000002'
-      });
-      await storage.getHistory();
-    } catch (error) {
-      const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-      history.unshift(record);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      syncService.addToQueue('ADD_HISTORY', record);
     }
   },
 

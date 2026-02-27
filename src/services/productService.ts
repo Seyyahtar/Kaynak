@@ -35,6 +35,15 @@ class ProductService {
         return items.map(mapFromBackend);
     }
 
+    async getProductsPage(page: number, size: number, sortField: string, sortDir: string): Promise<import('../types').PaginatedResponse<Product>> {
+        const response: any = await api.get(`/products/page?page=${page}&size=${size}&sortField=${sortField}&sortDir=${sortDir}`);
+        // Create a new response object with the content mapped to Frontend Product model
+        return {
+            ...response,
+            content: response.content.map(mapFromBackend)
+        };
+    }
+
     async getProductById(id: string): Promise<Product | undefined> {
         try {
             const item: any = await api.get(`/products/${id}`);
@@ -58,6 +67,10 @@ class ProductService {
         await api.delete(`/products/${id}`);
     }
 
+    async bulkImportFromExcel(payload: any): Promise<any> {
+        return await api.post('/products/bulk-import', payload);
+    }
+
     async deleteAllProducts(): Promise<void> {
         await api.delete('/products/all');
     }
@@ -68,29 +81,17 @@ class ProductService {
     }
 
     async getProductByProductCode(productCode: string): Promise<Product | undefined> {
-        const all = await this.getProducts();
-        return all.find(p => p.productCode === productCode.trim());
+        try {
+            const all = await this.getProducts();
+            return all.find(p => p.productCode === productCode.trim());
+        } catch {
+            return undefined;
+        }
     }
 
-    async isProductNameExists(name: string, excludeId?: string): Promise<boolean> {
-        const all = await this.getProducts();
-        const normalized = name.trim().toLowerCase();
-        return all.some(p => p.name.toLowerCase() === normalized && p.id !== excludeId);
-    }
-
-    async isProductCodeExists(code: string, excludeId?: string): Promise<boolean> {
-        if (!code) return false;
-        const all = await this.getProducts();
-        const normalized = code.trim();
-        return all.some(p => p.productCode === normalized && p.id !== excludeId);
-    }
-
-    async getUsedCustomFieldIds(): Promise<string[]> {
-        const products = await this.getProducts();
-        const fieldIds = new Set<string>();
-        products.forEach(p => Object.keys(p.customFields).forEach(id => fieldIds.add(id)));
-        return Array.from(fieldIds);
-    }
+    // NOTE: isProductNameExists, isProductCodeExists, getUsedCustomFieldIds removed.
+    // The backend already enforces uniqueness at the DB level and throws descriptive errors.
+    // Fetching the full product list just to do a client-side check was wasteful.
 }
 
 export const productService = new ProductService();

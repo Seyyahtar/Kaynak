@@ -34,22 +34,7 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
   });
 
   const [materials, setMaterials] = useState<MaterialInput[]>([]);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
-  useEffect(() => {
-    const loadStock = async () => {
-      try {
-        const user = storage.getUser();
-        if (user) {
-          const data = await stockService.getAll(user.id);
-          setStockItems(data);
-        }
-      } catch (error) {
-        toast.error('Stok bilgileri alınamadı');
-      }
-    };
-    loadStock();
-  }, []);
 
   const addMaterialInput = () => {
     setMaterials([
@@ -74,25 +59,34 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
 
       const updated = { ...m, [field]: value };
 
-      if (field === 'serialLotNumber' && value.trim() !== '') {
-        const matchingItems = stockItems.filter(item =>
-          item.serialLotNumber && item.serialLotNumber.toLowerCase().includes(value.toLowerCase())
-        );
-        console.log(`[Auto-fill Debug] typed: "${value}", matchingItems count: ${matchingItems.length}`, matchingItems);
+      if (field === 'serialLotNumber' && value.trim().length >= 2) {
+        // Debounced backend search for auto-fill
+        const user = storage.getUser();
+        stockService.search(value.trim(), user?.id).then(matchingItems => {
+          console.log(`[Auto-fill Debug] typed: "${value}", matchingItems count: ${matchingItems.length}`, matchingItems);
 
-        // Check if all matching entries belong to the exact same distinct product variant
-        const uniqueMatches = Array.from(
-          new Set(matchingItems.map(i => `${i.materialName}|${i.serialLotNumber}|${i.ubbCode || ''}`))
-        );
+          // Check if all matching entries belong to the exact same distinct product variant
+          const uniqueMatches = Array.from(
+            new Set(matchingItems.map(i => `${i.materialName}|${i.serialLotNumber}|${i.ubbCode || ''}`))
+          );
 
-        if (uniqueMatches.length === 1) {
-          console.log('[Auto-fill Debug] Auto-filling for 1 unique distinct match:', matchingItems[0]);
-          const matchedItem = matchingItems[0];
-          updated.materialName = matchedItem.materialName;
-          updated.serialLotNumber = matchedItem.serialLotNumber;
-          updated.ubbCode = matchedItem.ubbCode || '';
-          toast.success('Malzeme bilgileri otomatik dolduruldu');
-        }
+          if (uniqueMatches.length === 1) {
+            console.log('[Auto-fill Debug] Auto-filling for 1 unique distinct match:', matchingItems[0]);
+            const matchedItem = matchingItems[0];
+            setMaterials(prev => prev.map(mat => {
+              if (mat.id !== id) return mat;
+              return {
+                ...mat,
+                materialName: matchedItem.materialName,
+                serialLotNumber: matchedItem.serialLotNumber,
+                ubbCode: matchedItem.ubbCode || '',
+              };
+            }));
+            toast.success('Malzeme bilgileri otomatik dolduruldu');
+          }
+        }).catch(err => {
+          console.error('[Auto-fill] Search error:', err);
+        });
       }
 
       return updated;
@@ -128,21 +122,29 @@ export default function CaseEntry({ onNavigate }: CaseEntryProps) {
       return;
     }
 
+    // Backend-based stock validation
     const notInStock: string[] = [];
     const insufficientStock: string[] = [];
 
-    validMaterials.forEach((m) => {
-      const stockItem = stockItems.find(
-        item => item.materialName.toLowerCase() === m.materialName.toLowerCase() &&
-          item.serialLotNumber.toLowerCase() === m.serialLotNumber.toLowerCase()
-      );
+    const user = storage.getUser();
+    for (const m of validMaterials) {
+      try {
+        const results = await stockService.search(m.serialLotNumber, user?.id);
+        const stockItem = results.find(
+          (item: StockItem) => item.materialName.toLowerCase() === m.materialName.toLowerCase() &&
+            item.serialLotNumber.toLowerCase() === m.serialLotNumber.toLowerCase()
+        );
 
-      if (!stockItem) {
+        if (!stockItem) {
+          notInStock.push(`${m.materialName} (${m.serialLotNumber})`);
+        } else if (stockItem.quantity < parseInt(m.quantity)) {
+          insufficientStock.push(`${m.materialName} (Stok: ${stockItem.quantity}, İstenen: ${m.quantity})`);
+        }
+      } catch (err) {
+        console.error("[Stock validation] Error:", err);
         notInStock.push(`${m.materialName} (${m.serialLotNumber})`);
-      } else if (stockItem.quantity < parseInt(m.quantity)) {
-        insufficientStock.push(`${m.materialName} (Stok: ${stockItem.quantity}, İstenen: ${m.quantity})`);
       }
-    });
+    }
 
     if (notInStock.length > 0) {
       toast.error(`Bu malzemeler stokta bulunamadı: ${notInStock.join(', ')}`);

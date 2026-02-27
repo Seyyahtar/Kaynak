@@ -8,13 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Page, HistoryRecord, CaseRecord } from '@/types';
 import { storage } from '@/utils/storage';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import html2pdf from 'html2pdf.js';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
-import shareIcon from '@/assets/icons/share-2.svg';
-import downloadIcon from '@/assets/icons/download.svg';
+// Using string paths directly instead of imports for static assets
+const shareIcon = '/share-2.svg';
+const downloadIcon = '/download.svg';
 import { exportHistoryToExcel, shareHistoryToExcel } from '@/utils/excelUtils';
 import { UserFilter } from '@/components/UserFilter';
 import { UserRole } from '@/types';
@@ -35,6 +36,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     type: 'all',
     startDate: '',
     endDate: '',
+    search: '',
   });
 
   // User Filter State
@@ -77,38 +79,42 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
     }
   }
 
-  // Effect to reload history when user selection changes
+  // Effect to reload history when user selection or filters change
   useEffect(() => {
-    loadHistory(selectedUserIds);
-  }, [selectedUserIds]);
+    loadHistory(selectedUserIds, filters);
+  }, [selectedUserIds, filters]);
 
-  const loadHistory = async (userIds?: Set<string>) => {
+  const loadHistory = async (userIds?: Set<string>, currentFilters?: any) => {
     try {
-      // setLoading(true); // History page might not have loading state exposed yet, add if needed
-      let data: HistoryRecord[] = [];
+      const activeFilters: any = {};
 
+      // Pass standard filters
+      if (currentFilters?.startDate) activeFilters.startDate = currentFilters.startDate;
+      if (currentFilters?.endDate) activeFilters.endDate = currentFilters.endDate;
+      if (currentFilters?.type && currentFilters.type !== 'all') activeFilters.type = currentFilters.type;
+      if (currentFilters?.search) activeFilters.search = currentFilters.search;
+
+      // Pass user selection
       if (userIds && userIds.size > 0) {
-        // Fetch specific users' history on demand
-        const promises = Array.from(userIds).map(id => historyService.getAll(id));
-        const results = await Promise.all(promises);
-        data = results.flat();
-      } else {
-        // Default: Load current user's history
-        data = await storage.getHistory();
+        activeFilters.userIds = Array.from(userIds);
+      } else if (currentUserRole === 'KULLANICI') { // Fixed TS error (UserRole is 'KULLANICI')
+        // If regular user, backend will handle it, but we can be explicit
+        const user = storage.getUser();
+        if (user) activeFilters.userId = user.id;
       }
 
+      // Single call to backend with all filters applied at DB level
+      const data = await historyService.getAll(activeFilters);
       setHistory(data);
     } catch (error) {
       console.error("Geçmiş yüklenirken hata:", error);
       toast.error("Geçmiş verileri yüklenemedi");
-    } finally {
-      // setLoading(false); 
     }
   };
 
   const handleDownloadHistory = async () => {
     try {
-      await exportHistoryToExcel(filteredHistory);
+      await exportHistoryToExcel(history);
       toast.success('Geçmiş kayıtları indirildi');
     } catch (error) {
       toast.error('İndirme hatası: ' + (error as Error).message);
@@ -117,7 +123,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
 
   const handleShareHistory = async () => {
     try {
-      await shareHistoryToExcel(filteredHistory);
+      await shareHistoryToExcel(history);
       toast.success('Geçmiş kayıtları paylaşıldı');
     } catch (error) {
       toast.error('Paylaşım hatası: ' + (error as Error).message);
@@ -381,44 +387,8 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
       reader.readAsDataURL(blob);
     });
   };
-
-  const filteredHistory = React.useMemo(() => {
-    return history.filter((record) => {
-      if (filters.type !== 'all' && record.type !== filters.type) {
-        return false;
-      }
-
-      if (filters.startDate && record.date < filters.startDate) {
-        return false;
-      }
-      if (filters.endDate && record.date > filters.endDate) {
-        return false;
-      }
-
-      if (filters.endDate && record.date > filters.endDate) {
-        return false;
-      }
-
-      // User Filter
-      if (selectedUserIds.size > 0) {
-        // Use ownerId if available (robust)
-        if (record.ownerId) {
-          if (!selectedUserIds.has(record.ownerId)) {
-            return false;
-          }
-        } else {
-          // Fallback to name mapping
-          if (!record.ownerName) return false;
-          const ownerId = usersMap.get(record.ownerName);
-          if (!ownerId || !selectedUserIds.has(ownerId)) {
-            return false;
-          }
-        }
-      }
-
-      return true;
-    });
-  }, [history, filters, selectedUserIds, usersMap]);
+  // filteredHistory is no longer needed since backend does the filtering
+  // We can just use the 'history' state variable directly
 
   const getTypeLabel = (type: HistoryRecord['type']) => {
     switch (type) {
@@ -781,7 +751,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
             <Label>İşlem Tipi</Label>
             <Select
               value={filters.type}
-              onValueChange={(value) => setFilters({ ...filters, type: value })}
+              onValueChange={(value: string) => setFilters({ ...filters, type: value })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -819,7 +789,7 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
             variant="outline"
             className="w-full"
             onClick={() =>
-              setFilters({ type: 'all', startDate: '', endDate: '' })
+              setFilters({ type: 'all', startDate: '', endDate: '', search: '' })
             }
           >
             Filtreleri Temizle
@@ -869,13 +839,13 @@ export default function HistoryPage({ onNavigate }: HistoryPageProps) {
       )}
 
       <div className="p-4">
-        {filteredHistory.length === 0 ? (
+        {history.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-slate-500">Geçmiş kayıt bulunamadı</p>
           </Card>
         ) : (
           <div className="space-y-3">
-            {filteredHistory.map((record) => (
+            {history.map((record: HistoryRecord) => (
               <Card key={record.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">

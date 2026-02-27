@@ -2,13 +2,14 @@ package com.stok.app.repository;
 
 import com.stok.app.entity.ProductItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface ProductItemRepository extends JpaRepository<ProductItem, UUID> {
+public interface ProductItemRepository extends JpaRepository<ProductItem, UUID>, JpaSpecificationExecutor<ProductItem> {
 
     Optional<ProductItem> findByNameIgnoreCase(String name);
 

@@ -7,12 +7,23 @@ import com.stok.app.entity.CaseRecord;
 import com.stok.app.entity.User;
 import com.stok.app.exception.ResourceNotFoundException;
 import com.stok.app.repository.CaseRecordRepository;
+import com.stok.app.repository.projection.ImplantExportRowProjection;
 import com.stok.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +44,8 @@ public class CaseService {
     private final UserRepository userRepository;
     private final HistoryService historyService;
     private final StockService stockService;
+    private static final java.time.format.DateTimeFormatter EXPORT_DATE_FORMATTER = java.time.format.DateTimeFormatter
+            .ofPattern("dd.MM.yyyy");
 
     public List<CaseRecordResponse> getAllCases(UUID userId) {
         log.debug("Getting cases for user: {}", userId != null ? userId : "ALL USERS");
@@ -153,10 +166,103 @@ public class CaseService {
                 .build();
     }
 
+    public void deleteCase(UUID id, UUID userId) {
+        log.debug("Deleting case: {} for user: {}", id, userId);
+        CaseRecord caseRecord = caseRecordRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Case record not found"));
+
+        // Ownership check — privileged users (userId == null) skip it
+        if (userId != null && !caseRecord.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Unauthorized access to case record");
+        }
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("hospitalName", caseRecord.getHospitalName());
+        details.put("patientName", caseRecord.getPatientName());
+        details.put("date", caseRecord.getCaseDate() != null ? caseRecord.getCaseDate().toString() : null);
+
+        caseRecordRepository.delete(caseRecord);
+
+        historyService.addHistory(
+                userId != null ? userId : caseRecord.getUser().getId(),
+                "case-delete",
+                "Vaka kaydı silindi: " + caseRecord.getPatientName() + " - " + caseRecord.getHospitalName(),
+                details);
+
+        log.info("Case record deleted: {}", id);
+    }
+
     public void deleteAllCases(UUID userId) {
         log.debug("Deleting all cases for user: {}", userId);
         List<CaseRecord> userCases = caseRecordRepository.findByUserId(userId);
         caseRecordRepository.deleteAll(userCases);
         log.info("All cases deleted for user: {}", userId);
+    }
+
+    public byte[] exportImplantList(java.time.LocalDate startDate, java.time.LocalDate endDate, UUID userId) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("Start and end dates are required");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date cannot be after end date");
+        }
+
+        List<ImplantExportRowProjection> rows = caseRecordRepository.findImplantExportRows(startDate, endDate, userId);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("No case materials found in the given date range");
+        }
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Implant List");
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            String[] headers = new String[] {
+                    "document date",
+                    "customername",
+                    "implanter",
+                    "patient",
+                    "material name",
+                    "quantity",
+                    "serial no #"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIndex = 1;
+            for (ImplantExportRowProjection rowData : rows) {
+                Row row = sheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(rowData.getCaseDate().format(EXPORT_DATE_FORMATTER));
+                row.createCell(1).setCellValue(orEmpty(rowData.getHospitalName()));
+                row.createCell(2).setCellValue(orEmpty(rowData.getDoctorName()));
+                row.createCell(3).setCellValue(orEmpty(rowData.getPatientName()));
+                row.createCell(4).setCellValue(orEmpty(rowData.getMaterialName()));
+                row.createCell(5).setCellValue(rowData.getQuantity() != null ? rowData.getQuantity() : 0);
+                row.createCell(6).setCellValue(orEmpty(rowData.getSerialLotNumber()));
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate implant list Excel", e);
+        }
+    }
+
+    private String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

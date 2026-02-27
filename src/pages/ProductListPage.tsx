@@ -10,6 +10,14 @@ import { toast } from 'sonner';
 import { parseExcelFile, validateExcelFile } from '../utils/excelParser';
 import { exportProductsToExcel } from '../utils/excelUtils';
 import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -36,6 +44,12 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [importMode, setImportMode] = useState<'list' | 'update'>('list');
 
+    // Pagination States
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalElements, setTotalElements] = useState(0);
+    const pageSize = 20; // Default page size
+
     // Bulk Delete States
     const [isMultiDeleteMode, setIsMultiDeleteMode] = useState(false);
     const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -44,11 +58,15 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [currentPage, sortField, sortDirection]);
 
     const loadData = async () => {
         try {
-            setProducts(await productService.getProducts());
+            const pageData = await productService.getProductsPage(currentPage, pageSize, sortField, sortDirection);
+            setProducts(pageData.content);
+            setTotalPages(pageData.totalPages);
+            setTotalElements(pageData.totalElements);
+
             setFields(await customFieldService.getCustomFields());
         } catch (error: any) {
             toast.error('Ürün listesi yüklenirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
@@ -204,66 +222,38 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
 
     const usedFields = getUsedFields();
 
-    // Sorting function
+    // Sorting function (Updates state and triggers useEffect)
     const handleSort = (field: SortField) => {
         if (sortField === field) {
-            // If clicking the active field, reset to default (index)
-            setSortField('index');
-            setSortDirection('asc');
+            // Toggle direction or reset
+            if (sortDirection === 'asc') {
+                setSortDirection('desc');
+            } else {
+                setSortField('index');
+                setSortDirection('asc');
+            }
         } else {
             // New field, set to that field (ascending)
             setSortField(field);
             setSortDirection('asc');
         }
+        setCurrentPage(0); // Reset to first page when sorting changes
     };
 
-    // Sort products
-    const sortedProducts = [...products].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        if (sortField === 'index') {
-            // Use original index (no sorting actually)
-            return 0;
-        } else if (sortField === 'name') {
-            aValue = a.name.toLowerCase();
-            bValue = b.name.toLowerCase();
-        } else if (sortField === 'quantity') {
-            aValue = a.quantity ?? -1;
-            bValue = b.quantity ?? -1;
-        } else {
-            // Custom field
-            const field = usedFields.find(f => f.id === sortField);
-            if (field) {
-                aValue = getFieldValue(a, field);
-                bValue = getFieldValue(b, field);
-
-                // Handle empty values
-                if (!aValue && !bValue) return 0;
-                if (!aValue) return 1;
-                if (!bValue) return -1;
-
-                // Convert to lowercase for text comparison
-                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-            }
-        }
-
-        // Compare
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-    });
+    // Products are already sorted by the backend
+    const sortedProducts = products;
 
     // Export Handler
     const handleExport = async () => {
-        if (products.length === 0) {
+        if (totalElements === 0) {
             toast.error('Dışa aktarılacak ürün bulunamadı');
             return;
         }
 
         try {
-            await exportProductsToExcel(products, fields);
+            // Fetch all products for export, not just the current page
+            const allProducts = await productService.getProducts();
+            await exportProductsToExcel(allProducts, fields);
             toast.success('Excel dosyası oluşturuldu');
         } catch (error: any) {
             toast.error(error.message);
@@ -456,7 +446,7 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                             </td>
                                         )}
                                         <td className="px-4 py-3 text-sm text-slate-600">
-                                            {index + 1}
+                                            {(currentPage * pageSize) + index + 1}
                                         </td>
                                         <td className="px-4 py-3 text-sm font-medium text-slate-800">
                                             {product.name}
@@ -497,6 +487,36 @@ export default function ProductListPage({ onNavigate }: ProductListPageProps) {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="mt-6 flex justify-center">
+                        <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationPrevious
+                                        onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                                        className={currentPage === 0 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                        size="default"
+                                    />
+                                </PaginationItem>
+
+                                {/* Simple implementation: display current / total. For a full app, render dynamic page numbers */}
+                                <div className="text-sm font-medium text-slate-600 px-4">
+                                    Sayfa {currentPage + 1} / {totalPages}
+                                </div>
+
+                                <PaginationItem>
+                                    <PaginationNext
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                                        className={currentPage === totalPages - 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                        size="default"
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
                     </div>
                 )}
             </div>

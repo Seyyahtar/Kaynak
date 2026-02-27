@@ -6,10 +6,14 @@ import com.stok.app.dto.response.CaseRecordResponse;
 import com.stok.app.service.CaseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -83,6 +87,33 @@ public class CaseController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Case record created successfully", caseRecord));
+    }
+
+    @GetMapping(value = "/implant-list/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> exportImplantList(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = getEffectiveUserId(userId, true);
+        byte[] file = caseService.exportImplantList(startDate, endDate, effectiveUserId);
+
+        String filename = String.format("BIO-TR_implant_list_%s_%s.xlsx", startDate, endDate);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(
+                MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+        headers.setContentLength(file.length);
+
+        return new ResponseEntity<>(file, headers, HttpStatus.OK);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteCase(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = getEffectiveUserId(userId, true); // allow privileged to delete any
+        caseService.deleteCase(id, effectiveUserId);
+        return ResponseEntity.ok(ApiResponse.success("Case record deleted successfully", null));
     }
 
     @DeleteMapping("/all")

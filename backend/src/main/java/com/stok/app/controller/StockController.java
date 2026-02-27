@@ -75,6 +75,29 @@ public class StockController {
         return ResponseEntity.ok(ApiResponse.success(stock));
     }
 
+    @GetMapping("/grouped")
+    @Operation(summary = "Get grouped stock items", description = "Retrieves stock items hierarchically grouped by Prefix and Material Name.")
+    public ResponseEntity<ApiResponse<List<com.stok.app.dto.response.PrefixGroupResponse>>> getGroupedStock(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) List<UUID> userIds,
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = getEffectiveUserId(userId);
+        List<com.stok.app.dto.response.PrefixGroupResponse> groupedStock = stockService.getGroupedStocks(
+                effectiveUserId, search, category, userIds);
+        return ResponseEntity.ok(ApiResponse.success(groupedStock));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search stock items", description = "Search stock items by serial/lot number or material name. Returns max 10 results.")
+    public ResponseEntity<ApiResponse<List<StockItemResponse>>> searchStock(
+            @RequestParam String query,
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = getEffectiveUserId(userId);
+        List<StockItemResponse> results = stockService.searchStock(effectiveUserId, query);
+        return ResponseEntity.ok(ApiResponse.success(results));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<StockItemResponse>> addStock(
             @Valid @RequestBody StockItemRequest request,
@@ -95,6 +118,18 @@ public class StockController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Stock items added successfully", stockItems));
+    }
+
+    @PostMapping("/bulk-import")
+    public ResponseEntity<ApiResponse<com.stok.app.dto.response.BulkImportResponse>> bulkImport(
+            @Valid @RequestBody List<StockItemRequest> requests,
+            @RequestParam(required = false) UUID userId) {
+        UUID effectiveUserId = getEffectiveUserId(userId);
+        com.stok.app.dto.response.BulkImportResponse result = stockService.bulkImportWithDuplicateCheck(requests,
+                effectiveUserId);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Bulk import completed", result));
     }
 
     @PutMapping("/{id}")

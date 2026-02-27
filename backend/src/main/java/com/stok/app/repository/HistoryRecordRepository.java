@@ -8,11 +8,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 /**
  * HistoryRecord Repository
  */
 @Repository
-public interface HistoryRecordRepository extends JpaRepository<HistoryRecord, UUID> {
+public interface HistoryRecordRepository
+        extends JpaRepository<HistoryRecord, UUID>, JpaSpecificationExecutor<HistoryRecord> {
 
     List<HistoryRecord> findByUserId(UUID userId);
 

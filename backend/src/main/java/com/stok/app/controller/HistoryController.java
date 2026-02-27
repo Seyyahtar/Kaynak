@@ -55,9 +55,16 @@ public class HistoryController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<HistoryRecordResponse>>> getAllHistory(
-            @RequestParam(required = false) UUID userId) {
+            @RequestParam(required = false) UUID userId, // Represents the specific user requesting
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime endDate,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) List<UUID> userIds // Array of IDs when manager filters by multiple
+    ) {
         UUID effectiveUserId = getEffectiveUserId(userId);
-        List<HistoryRecordResponse> history = historyService.getAllHistory(effectiveUserId);
+        List<HistoryRecordResponse> history = historyService.getAllHistory(
+                effectiveUserId, startDate, endDate, type, search, userIds);
         return ResponseEntity.ok(ApiResponse.success(history));
     }
 

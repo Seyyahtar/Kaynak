@@ -288,156 +288,21 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
         setIsImporting(true);
 
         try {
-            // Create new fields first
-            const newFieldsMap: Record<string, string> = {}; // ColumnName -> FieldId
+            const payload = {
+                importMode,
+                mappings,
+                rows,
+                columns: columns.map(c => c.name)
+            };
 
-            for (const mapping of newFields) {
-                if (mapping.newFieldName) {
-                    const newField = await customFieldService.addCustomField(
-                        mapping.newFieldName,
-                        mapping.newFieldType || 'text'
-                    );
-                    newFieldsMap[mapping.excelColumn] = newField.id;
-                }
-            }
-
-            let successCount = 0;
-            let errorCount = 0;
-            let notFoundCount = 0;
-
-            // Import/Update products
-            for (const row of rows) {
-                try {
-                    const productData: any = {
-                        customFields: {}
-                    };
-
-                    mappings.forEach((mapping, index) => {
-                        const value = row[index];
-                        if (!value) return;
-
-                        const column = columns[index];
-
-                        // Skip IGNOREd columns
-                        if (mapping.targetField === 'IGNORE') return;
-
-                        // 1. Process Main Mapping
-                        if (mapping.targetField) {
-                            if (mapping.targetField === 'name') {
-                                productData.name = String(value);
-                            } else if (mapping.targetField === 'quantity') {
-                                productData.quantity = Number(value) || 0;
-                            } else if (mapping.targetField === 'serial_number') {
-                                productData.serialNumber = String(value);
-                            } else if (mapping.targetField === 'lot_number') {
-                                productData.lotNumber = String(value);
-                            } else if (mapping.targetField === 'expiry_date') {
-                                productData.expiryDate = String(value);
-                            } else if (mapping.targetField === 'ubb_code') {
-                                productData.ubbCode = String(value);
-                            } else if (mapping.targetField === 'product_code') {
-                                productData.productCode = String(value);
-                            } else if (mapping.targetField === 'NEW') {
-                                // Use the newly created field ID
-                                const fieldId = newFieldsMap[mapping.excelColumn];
-                                if (fieldId) {
-                                    productData.customFields[fieldId] = value;
-                                }
-                            } else {
-                                // Existing custom field
-                                productData.customFields[mapping.targetField] = value;
-                            }
-                        }
-
-                        // 2. Process Sub-Mappings (Combined Data)
-                        if (column.hasCombinedData && mapping.subMappings) {
-                            const extractedData = extractCombinedCellData(value);
-
-                            if (extractedData) {
-                                // Process SERI
-                                if (extractedData.seri && mapping.subMappings.seri && mapping.subMappings.seri !== 'IGNORE') {
-                                    const target = mapping.subMappings.seri;
-                                    if (target === 'serial_number') productData.serialNumber = extractedData.seri;
-                                    else if (target === 'lot_number') productData.lotNumber = extractedData.seri;
-                                    else if (target === 'expiry_date') productData.expiryDate = extractedData.seri;
-                                    else if (target === 'ubb_code') productData.ubbCode = extractedData.seri;
-                                    else if (target === 'product_code') productData.productCode = extractedData.seri;
-                                    else if (target !== 'NEW') productData.customFields[target] = extractedData.seri;
-                                }
-
-                                // Process LOT
-                                if (extractedData.lot && mapping.subMappings.lot && mapping.subMappings.lot !== 'IGNORE') {
-                                    const target = mapping.subMappings.lot;
-                                    if (target === 'serial_number') productData.serialNumber = extractedData.lot;
-                                    else if (target === 'lot_number') productData.lotNumber = extractedData.lot;
-                                    else if (target === 'expiry_date') productData.expiryDate = extractedData.lot;
-                                    else if (target === 'ubb_code') productData.ubbCode = extractedData.lot;
-                                    else if (target === 'product_code') productData.productCode = extractedData.lot;
-                                    else if (target !== 'NEW') productData.customFields[target] = extractedData.lot;
-                                }
-
-                                // Process SKT
-                                if (extractedData.skt && mapping.subMappings.skt && mapping.subMappings.skt !== 'IGNORE') {
-                                    const target = mapping.subMappings.skt;
-                                    if (target === 'serial_number') productData.serialNumber = extractedData.skt;
-                                    else if (target === 'lot_number') productData.lotNumber = extractedData.skt;
-                                    else if (target === 'expiry_date') productData.expiryDate = extractedData.skt;
-                                    else if (target === 'ubb_code') productData.ubbCode = extractedData.skt;
-                                    else if (target === 'product_code') productData.productCode = extractedData.skt;
-                                    else if (target !== 'NEW') productData.customFields[target] = extractedData.skt;
-                                }
-
-                                // Process UBB
-                                if (extractedData.ubb && mapping.subMappings.ubb && mapping.subMappings.ubb !== 'IGNORE') {
-                                    const target = mapping.subMappings.ubb;
-                                    if (target === 'serial_number') productData.serialNumber = extractedData.ubb;
-                                    else if (target === 'lot_number') productData.lotNumber = extractedData.ubb;
-                                    else if (target === 'expiry_date') productData.expiryDate = extractedData.ubb;
-                                    else if (target === 'ubb_code') productData.ubbCode = extractedData.ubb;
-                                    else if (target === 'product_code') productData.productCode = extractedData.ubb;
-                                    else if (target !== 'NEW') productData.customFields[target] = extractedData.ubb;
-                                }
-                            }
-                        }
-                    });
-
-                    if (importMode === 'update') {
-                        if (!productData.productCode) {
-                            errorCount++;
-                            continue;
-                        }
-
-                        const existingProduct = await productService.getProductByProductCode(productData.productCode);
-                        if (existingProduct) {
-                            // Merge data
-                            const updatedData = {
-                                ...existingProduct,
-                                ...productData,
-                                customFields: {
-                                    ...existingProduct.customFields,
-                                    ...productData.customFields
-                                }
-                            };
-                            await productService.updateProduct(existingProduct.id, updatedData);
-                            successCount++;
-                        } else {
-                            notFoundCount++;
-                        }
-                    } else {
-                        // Create mode
-                        if (productData.name) {
-                            await productService.createProduct(productData);
-                            successCount++;
-                        }
-                    }
-                } catch (error) {
-                    errorCount++;
-                    console.error('Row import error:', error);
-                }
-            }
+            const response = await productService.bulkImportFromExcel(payload);
+            const { successCount, errorCount, notFoundCount, errorMessages } = response;
 
             if (successCount > 0) {
                 toast.success(`${successCount} ürün başarıyla ${importMode === 'update' ? 'güncellendi' : 'içe aktarıldı'}`);
+                onNavigate('product-list');
+            } else if (errorCount === 0 && notFoundCount === 0) {
+                toast.info('İçe aktarılacak geçerli veri bulunamadı');
                 onNavigate('product-list');
             }
 
@@ -446,11 +311,13 @@ export default function ExcelImportPage({ onNavigate, importData }: ExcelImportP
             }
 
             if (errorCount > 0) {
-                toast.warning(`${errorCount} satır işlenemedi`);
+                toast.error(`${errorCount} satır işlenemedi. ${errorMessages?.[0] ? 'İlk Hata: ' + errorMessages[0] : ''}`);
             }
 
         } catch (error: any) {
-            toast.error('İçe aktarma başarısız: ' + error.message);
+            console.error("Import error:", error);
+            const backendMsg = error.response?.data?.message;
+            toast.error('İçe aktarma başarısız: ' + (backendMsg || error.message));
         } finally {
             setIsImporting(false);
         }
